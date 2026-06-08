@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -15,6 +15,7 @@ import { projectListOptions } from "@multica/core/projects/queries";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useWorkspacePaths } from "@multica/core/paths";
 import { CircuitNode, type CircuitFlowNode } from "./circuit-node";
+import { DetailPanel } from "./detail-panel";
 import { CIRCUIT_COLORS } from "./circuit-theme";
 
 const nodeTypes = { circuit: CircuitNode };
@@ -30,16 +31,25 @@ export default function CanvasPage() {
   const wsPaths = useWorkspacePaths();
   const { data: projects, isLoading } = useQuery(projectListOptions(wsId));
 
-  // 点击电路板节点 → 进入对应生产线(项目)详情页。
-  const onNodeClick = useCallback(
-    (_: unknown, node: CircuitFlowNode) => {
-      router.push(wsPaths.projectDetail(node.id));
-    },
-    [router, wsPaths],
-  );
+  // 当前选中的节点 id → 决定是否弹出内联详情面板。
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // 点击电路板节点 → 打开内联详情面板(不再跳走到独立详情页)。
+  const onNodeClick = useCallback((_: unknown, node: CircuitFlowNode) => {
+    setSelectedId(node.id);
+  }, []);
 
   // 取前 5 条生产线(项目),每条画成一个电路板节点。
   const lines = useMemo(() => (projects ?? []).slice(0, 5), [projects]);
+
+  // 选中节点对应的项目 + 它在画布上的编号(PL1..),供详情面板展示。
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    const idx = lines.findIndex((p) => p.id === selectedId);
+    const project = idx < 0 ? undefined : lines[idx];
+    if (!project) return null;
+    return { project, code: `PL${idx + 1}` };
+  }, [selectedId, lines]);
 
   const nodes = useMemo<CircuitFlowNode[]>(
     () =>
@@ -131,6 +141,17 @@ export default function CanvasPage() {
           <Controls showInteractive={false} />
         </ReactFlow>
       )}
+
+      {selected ? (
+        <DetailPanel
+          project={selected.project}
+          code={selected.code}
+          onOpenDetail={() =>
+            router.push(wsPaths.projectDetail(selected.project.id))
+          }
+          onClose={() => setSelectedId(null)}
+        />
+      ) : null}
     </div>
   );
 }

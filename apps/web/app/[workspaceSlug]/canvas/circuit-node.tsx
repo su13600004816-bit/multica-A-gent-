@@ -18,7 +18,7 @@ export type CircuitFlowNode = Node<CircuitNodeData, "circuit">;
 const handleClass =
   "!h-3 !w-3 !rounded-full !border-2 !border-[#05080d]";
 
-export function CircuitNode({ data }: NodeProps<CircuitFlowNode>) {
+export function CircuitNode({ data, selected }: NodeProps<CircuitFlowNode>) {
   const meta = statusMeta(data.status);
   const accent = meta.accent;
   const pct =
@@ -32,9 +32,12 @@ export function CircuitNode({ data }: NodeProps<CircuitFlowNode>) {
       style={{
         backgroundColor: CIRCUIT_COLORS.panel,
         borderColor: accent,
-        boxShadow: `0 0 24px rgba(0,0,0,0.35), 0 0 18px ${accent}22`,
+        // 选中(面板已打开)的节点用更强的描边光晕标记当前查看对象。
+        boxShadow: selected
+          ? `0 0 24px rgba(0,0,0,0.35), 0 0 0 1px ${accent}, 0 0 28px ${accent}55`
+          : `0 0 24px rgba(0,0,0,0.35), 0 0 18px ${accent}22`,
       }}
-      title="点击进入该生产线"
+      title="点击查看该生产线详情"
     >
       <Handle
         type="target"
