@@ -1054,6 +1054,30 @@ func logClaimEndpointSlow(runtimeID, outcome string, start time.Time, authMs, cl
 	)
 }
 
+// sessionResumeBlocked reports whether the daemon must start a FRESH agent
+// session for this task instead of resuming a prior one (PL-91). It returns
+// true when an operator disabled session resume for the agent/workspace, or
+// when the issue's memory was compacted.
+//
+// Checks are best-effort and fail OPEN: on any lookup error we return false
+// and keep the historical resume behaviour, because a failed check must never
+// strand a task without its conversation context. Pass an invalid issueID for
+// chat tasks (chat compaction is read directly from chat_session.compacted_at
+// by the caller).
+func (h *Handler) sessionResumeBlocked(ctx context.Context, agentID, issueID pgtype.UUID) bool {
+	if agentID.Valid {
+		if enabled, err := h.Queries.GetAgentSessionResumeEnabled(ctx, agentID); err == nil && !enabled {
+			return true
+		}
+	}
+	if issueID.Valid {
+		if at, err := h.Queries.GetIssueMemoryCompactedAt(ctx, issueID); err == nil && at.Valid {
+			return true
+		}
+	}
+	return false
+}
+
 // ClaimTaskByRuntime atomically claims the next queued task for a runtime.
 // The response includes the agent's name and skills, fetched fresh from the DB.
 func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
@@ -1303,7 +1327,12 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		// the user just judged the prior output bad, so the daemon must start a
 		// fresh agent session in a fresh workdir instead of resuming anything
 		// from the same conversation that produced that output.
-		if !task.ForceFreshSession {
+		//
+		// Also skip when the issue's memory was compacted (PL-91) or an
+		// operator disabled session resume for this agent/workspace: in both
+		// cases the next task must start fresh and rely on the injected T1/T2
+		// summary instead of re-ingesting the old provider session.
+		if !task.ForceFreshSession && !h.sessionResumeBlocked(r.Context(), task.AgentID, task.IssueID) {
 			if prior, err := h.Queries.GetLastTaskSession(r.Context(), db.GetLastTaskSessionParams{
 				AgentID: task.AgentID,
 				IssueID: task.IssueID,
@@ -1335,7 +1364,12 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 					resp.Repos = repos
 				}
 			}
-			if !task.ForceFreshSession {
+			// Compacted chat sessions (PL-91) had their session_id/work_dir
+			// cleared and compacted_at stamped; the operator kill switch can
+			// also force fresh. In either case do not resume — the fresh
+			// session carries only the injected summary.
+			if !task.ForceFreshSession && !cs.CompactedAt.Valid &&
+				!h.sessionResumeBlocked(r.Context(), task.AgentID, pgtype.UUID{}) {
 				// Resume chat sessions only when the stored pointer was produced
 				// by the same runtime as the claiming task. When the chat_session
 				// pointer is missing (legacy NULL runtime_id), stale (last task
