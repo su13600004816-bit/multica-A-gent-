@@ -20,13 +20,18 @@ import {
   STATUS_FLOW_ORDER,
   statusFlowRank,
   statusMeta,
-  edgeAccent,
 } from "./circuit-theme";
 
 const nodeTypes = { circuit: CircuitNode };
 
+// 画布只渲染来自真实数据的关系连线。Project 数据模型(packages/core/types/project.ts)
+// 没有任何项目间关系字段(无 parent / depends_on / related),后端也没有对应的关系接口,
+// 因此当前没有可画的真实连线 —— 绝不按「状态排序后相邻」之类的排布次序合成假线。
+// 等数据源出现真实项目关系时,在此用该字段生成 edges。
+const NO_EDGES: Edge[] = [];
+
 // 按状态分泳道(列)排布:同状态的生产线落在同一列,沿生命周期方向从左到右。
-const LANE_GAP_X = 360; // 列间距,需大于节点宽度(260)留出走线空间
+const LANE_GAP_X = 360; // 列间距,大于节点宽度(260)让相邻泳道留出间隔
 const ROW_GAP_Y = 196; // 同一泳道内节点的纵向间距
 const ORIGIN_X = 80;
 const ORIGIN_Y = 140;
@@ -47,7 +52,8 @@ export default function CanvasPage() {
     [router, wsPaths],
   );
 
-  // 取若干条生产线(项目),按生命周期状态排序 —— 同状态相邻,便于分泳道。
+  // 取若干条生产线(项目),按生命周期状态排序 —— 仅为把同状态节点排到一起、
+  // 便于分泳道与稳定的 PL 编号,排序次序本身不代表任何项目间关系。
   const lines = useMemo(() => {
     const list = (projects ?? []).slice(0, MAX_LINES);
     return [...list].sort(
@@ -87,32 +93,6 @@ export default function CanvasPage() {
     });
   }, [lines]);
 
-  // 走线体现真实状态流转:节点已按生命周期排序,沿此序串成一条信号链。
-  // 同状态相邻 → 同泳道内的纵向连线(同阶段并行);跨状态相邻 → 跨泳道的流转连线
-  // (用 animated 高亮信号方向)。每条线的颜色取源节点状态的强调色,和节点着色一致。
-  const edges = useMemo<Edge[]>(() => {
-    const out: Edge[] = [];
-    for (let i = 0; i < lines.length - 1; i++) {
-      const from = lines[i];
-      const to = lines[i + 1];
-      if (!from || !to) continue;
-      const crossStage = from.status !== to.status;
-      out.push({
-        id: `${from.id}->${to.id}`,
-        source: from.id,
-        target: to.id,
-        type: "smoothstep",
-        animated: crossStage,
-        style: {
-          stroke: edgeAccent(from.status),
-          strokeWidth: crossStage ? 2 : 1.5,
-          opacity: crossStage ? 0.9 : 0.55,
-        },
-      });
-    }
-    return out;
-  }, [lines]);
-
   return (
     <div
       className="relative h-svh w-full"
@@ -134,7 +114,7 @@ export default function CanvasPage() {
         <div className="mt-0.5 text-xs" style={{ color: CIRCUIT_COLORS.slate }}>
           {isLoading
             ? "加载生产线中…"
-            : `${lines.length} 条生产线 · 按状态分泳道 · 走线沿生命周期流转`}
+            : `${lines.length} 条生产线 · 按状态分泳道着色`}
         </div>
       </div>
 
@@ -186,7 +166,7 @@ export default function CanvasPage() {
         <ReactFlow
           colorMode="dark"
           nodes={nodes}
-          edges={edges}
+          edges={NO_EDGES}
           nodeTypes={nodeTypes}
           onNodeClick={onNodeClick}
           fitView

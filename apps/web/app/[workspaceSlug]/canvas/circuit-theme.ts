@@ -32,8 +32,8 @@ export function statusMeta(status: ProjectStatus): StatusMeta {
 }
 
 // 生产线生命周期顺序(规划 → 进行 → 暂停 → 完成 → 取消)。
-// 画布按此顺序把同状态的节点分到同一条「泳道」,并沿此方向串联信号走线,
-// 让连线体现真实的状态流转,而不是项目列表的偶然次序。
+// 仅用于把同状态的节点分到同一条「泳道」并决定泳道从左到右的排列次序,
+// 不据此合成任何连线 —— 项目数据里没有真实的项目间关系。
 export const STATUS_FLOW_ORDER: ProjectStatus[] = [
   "planned",
   "in_progress",
@@ -42,13 +42,8 @@ export const STATUS_FLOW_ORDER: ProjectStatus[] = [
   "cancelled",
 ];
 
-// 取某状态在生命周期里的序号;未知状态排到最后,保证排序稳定。
+// 取某状态在生命周期里的序号;未知状态排到最后,保证泳道排列稳定。
 export function statusFlowRank(status: ProjectStatus): number {
   const i = STATUS_FLOW_ORDER.indexOf(status);
   return i === -1 ? STATUS_FLOW_ORDER.length : i;
-}
-
-// 走线颜色取自源节点状态的强调色,让连线和节点状态着色保持一致。
-export function edgeAccent(status: ProjectStatus): string {
-  return statusMeta(status).accent;
 }
