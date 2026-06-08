@@ -1,1 +1,1 @@
-export { SquadsPage, SquadDetailPage } from "./components";
+export { SquadsPage, SquadDetailPage, SquadCanvasDetailPage } from "./components";

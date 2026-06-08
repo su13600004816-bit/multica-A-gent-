@@ -2,8 +2,20 @@
   "page": {
     "title": "小队",
     "new_button": "新建小队",
+    "new_canvas_button": "新建画布",
     "empty_no_squads": "还没有小队，创建一个开始吧。",
     "empty_no_match": "没有匹配筛选条件的小队。"
+  },
+  "new_canvas_dialog": {
+    "title": "新建画布",
+    "description": "选择一个小队，打开它的画布。每个小队都有自己的画布。",
+    "search_placeholder": "搜索小队…",
+    "empty": "还没有小队。先创建一个小队，它会自带画布。",
+    "cancel": "取消"
+  },
+  "canvas_tab": {
+    "board_title": "{{name}} 画布",
+    "root_subtitle_other": "{{count}} 名成员"
   },
   "inspector": {
     "details_section": "详情",
