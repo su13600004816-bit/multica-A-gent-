@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   ReactFlow,
@@ -12,6 +13,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { projectListOptions } from "@multica/core/projects/queries";
 import { useWorkspaceId } from "@multica/core/hooks";
+import { useWorkspacePaths } from "@multica/core/paths";
 import { CircuitNode, type CircuitFlowNode } from "./circuit-node";
 import { CIRCUIT_COLORS } from "./circuit-theme";
 
@@ -24,7 +26,17 @@ const ORIGIN_Y = 220;
 
 export default function CanvasPage() {
   const wsId = useWorkspaceId();
+  const router = useRouter();
+  const wsPaths = useWorkspacePaths();
   const { data: projects, isLoading } = useQuery(projectListOptions(wsId));
+
+  // 点击电路板节点 → 进入对应生产线(项目)详情页。
+  const onNodeClick = useCallback(
+    (_: unknown, node: CircuitFlowNode) => {
+      router.push(wsPaths.projectDetail(node.id));
+    },
+    [router, wsPaths],
+  );
 
   // 取前 5 条生产线(项目),每条画成一个电路板节点。
   const lines = useMemo(() => (projects ?? []).slice(0, 5), [projects]);
@@ -102,6 +114,7 @@ export default function CanvasPage() {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          onNodeClick={onNodeClick}
           fitView
           fitViewOptions={{ padding: 0.3 }}
           proOptions={{ hideAttribution: true }}

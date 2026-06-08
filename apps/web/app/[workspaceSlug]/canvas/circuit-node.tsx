@@ -21,15 +21,20 @@ const handleClass =
 export function CircuitNode({ data }: NodeProps<CircuitFlowNode>) {
   const meta = statusMeta(data.status);
   const accent = meta.accent;
+  const pct =
+    data.issueCount > 0
+      ? Math.round((data.doneCount / data.issueCount) * 100)
+      : 0;
 
   return (
     <div
-      className="relative w-[260px] border p-3"
+      className="relative w-[260px] cursor-pointer border p-3 transition-shadow hover:brightness-110"
       style={{
         backgroundColor: CIRCUIT_COLORS.panel,
         borderColor: accent,
         boxShadow: `0 0 24px rgba(0,0,0,0.35), 0 0 18px ${accent}22`,
       }}
+      title="点击进入该生产线"
     >
       <Handle
         type="target"
@@ -62,6 +67,17 @@ export function CircuitNode({ data }: NodeProps<CircuitFlowNode>) {
         </div>
       </div>
 
+      {/* 任务完成进度条(电路走线) */}
+      <div
+        className="mb-2 h-1 w-full overflow-hidden"
+        style={{ backgroundColor: CIRCUIT_COLORS.line }}
+      >
+        <div
+          className="h-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: accent }}
+        />
+      </div>
+
       <div className="flex items-center justify-between gap-2">
         <span
           className="inline-flex items-center gap-1.5 border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em]"
@@ -77,7 +93,7 @@ export function CircuitNode({ data }: NodeProps<CircuitFlowNode>) {
           className="font-mono text-[10px]"
           style={{ color: CIRCUIT_COLORS.slate }}
         >
-          完成 {data.doneCount}/{data.issueCount}
+          完成 {data.doneCount}/{data.issueCount} · {pct}%
         </span>
       </div>
 
