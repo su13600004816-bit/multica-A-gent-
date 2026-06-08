@@ -30,3 +30,25 @@ export const STATUS_META: Record<ProjectStatus, StatusMeta> = {
 export function statusMeta(status: ProjectStatus): StatusMeta {
   return STATUS_META[status] ?? { label: status, accent: CIRCUIT_COLORS.slate };
 }
+
+// 生产线生命周期顺序(规划 → 进行 → 暂停 → 完成 → 取消)。
+// 画布按此顺序把同状态的节点分到同一条「泳道」,并沿此方向串联信号走线,
+// 让连线体现真实的状态流转,而不是项目列表的偶然次序。
+export const STATUS_FLOW_ORDER: ProjectStatus[] = [
+  "planned",
+  "in_progress",
+  "paused",
+  "completed",
+  "cancelled",
+];
+
+// 取某状态在生命周期里的序号;未知状态排到最后,保证排序稳定。
+export function statusFlowRank(status: ProjectStatus): number {
+  const i = STATUS_FLOW_ORDER.indexOf(status);
+  return i === -1 ? STATUS_FLOW_ORDER.length : i;
+}
+
+// 走线颜色取自源节点状态的强调色,让连线和节点状态着色保持一致。
+export function edgeAccent(status: ProjectStatus): string {
+  return statusMeta(status).accent;
+}
