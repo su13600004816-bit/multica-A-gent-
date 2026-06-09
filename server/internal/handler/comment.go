@@ -942,6 +942,14 @@ func (h *Handler) triggerTasksForComment(ctx context.Context, issue db.Issue, co
 	}
 
 	h.enqueueMentionedAgentTasks(ctx, issue, comment, parentComment, actorType, actorID)
+
+	// Stage orchestrator: react to VERDICT comments (audit/gate PASS/FAIL) to
+	// advance the pipeline. System-authored comments are ignored inside
+	// OnComment, so the orchestrator's own messages cannot form a loop. No-op
+	// unless the orchestrator is enabled for the workspace.
+	if h.Orchestrator != nil {
+		h.Orchestrator.OnComment(ctx, issue, comment, actorType, actorID)
+	}
 }
 
 // commentMentionsOthersButNotAssignee returns true if the comment @mentions

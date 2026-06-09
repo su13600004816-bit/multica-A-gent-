@@ -317,6 +317,12 @@ func main() {
 	go heartbeatScheduler.Run(sweepCtx)
 	go runAutopilotScheduler(autopilotCtx, queries, autopilotSvc)
 	go runAutopilotFailureMonitor(autopilotCtx, queries, bus, envFailureMonitorConfig())
+
+	// Stage orchestrator watchdog: nudges the line leader when a pipeline
+	// stage completes but the next action stalls (PL-106). The event-driven
+	// half lives in the HTTP handler; this is the periodic backstop.
+	stageOrchestrator := service.NewStageOrchestrator(queries, pool, taskSvc, bus)
+	go runStageWatchdog(sweepCtx, stageOrchestrator)
 	go runDBStatsLogger(sweepCtx, pool)
 
 	if metricsServer != nil {

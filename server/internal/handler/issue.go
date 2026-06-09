@@ -2557,6 +2557,13 @@ func (h *Handler) UpdateIssue(w http.ResponseWriter, r *http.Request) {
 		h.notifyParentOfChildDone(r.Context(), prevIssue, issue)
 	}
 
+	// Stage orchestrator: drive the dev -> audit -> rework -> gate -> done
+	// pipeline off issue status transitions (e.g. dev -> in_review auto-dispatches
+	// the first audit). No-op unless the orchestrator is enabled for the workspace.
+	if statusChanged && h.Orchestrator != nil {
+		h.Orchestrator.OnIssueStatusChanged(r.Context(), prevIssue, issue)
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -3030,6 +3037,11 @@ func (h *Handler) BatchUpdateIssues(w http.ResponseWriter, r *http.Request) {
 		// (MUL-2538). Best-effort; failure does not abort the batch.
 		if statusChanged {
 			h.notifyParentOfChildDone(r.Context(), prevIssue, issue)
+		}
+
+		// Stage orchestrator, mirrored from UpdateIssue.
+		if statusChanged && h.Orchestrator != nil {
+			h.Orchestrator.OnIssueStatusChanged(r.Context(), prevIssue, issue)
 		}
 
 		updated++

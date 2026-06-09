@@ -96,6 +96,7 @@ type Handler struct {
 	Bus                   *events.Bus
 	TaskService           *service.TaskService
 	AutopilotService      *service.AutopilotService
+	Orchestrator          *service.StageOrchestrator
 	EmailService          *service.EmailService
 	UpdateStore           UpdateStore
 	ModelListStore        ModelListStore
@@ -132,6 +133,14 @@ func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *event
 
 	taskSvc := service.NewTaskService(queries, txStarter, hub, bus, daemonHub)
 	taskSvc.Analytics = analyticsClient
+	// The stage orchestrator needs raw access to its two tables; it is wired
+	// only when the txStarter doubles as a dbExecutor (the real *pgxpool.Pool).
+	// Tests that pass a non-executor txStarter get a nil orchestrator and the
+	// call sites no-op.
+	var orchestrator *service.StageOrchestrator
+	if executor != nil {
+		orchestrator = service.NewStageOrchestrator(queries, executor, taskSvc, bus)
+	}
 	return &Handler{
 		Queries:               queries,
 		DB:                    executor,
@@ -140,6 +149,7 @@ func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *event
 		DaemonHub:             daemonHub,
 		Bus:                   bus,
 		TaskService:           taskSvc,
+		Orchestrator:          orchestrator,
 		AutopilotService:      service.NewAutopilotService(queries, txStarter, bus, taskSvc),
 		EmailService:          emailService,
 		UpdateStore:           NewInMemoryUpdateStore(),
