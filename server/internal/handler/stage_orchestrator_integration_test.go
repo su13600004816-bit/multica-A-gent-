@@ -165,6 +165,14 @@ func (fx stageOrchFixture) inReview(t *testing.T) {
 // re-dispatched to the same auditor whose first audit task has finished).
 func (fx stageOrchFixture) verdict(t *testing.T, author pgtype.UUID, body string) {
 	t.Helper()
+	fx.verdictFrom(t, "agent", author, body)
+}
+
+// verdictFrom posts a VERDICT comment authored by an arbitrary actor (agent or
+// member) and runs it through the orchestrator. Used to assert that only the
+// stage-owning agent can drive the state machine.
+func (fx stageOrchFixture) verdictFrom(t *testing.T, authorType string, author pgtype.UUID, body string) {
+	t.Helper()
 	ctx := context.Background()
 	testPool.Exec(ctx,
 		`UPDATE agent_task_queue SET status = 'completed' WHERE issue_id = $1 AND agent_id = $2 AND status IN ('queued','dispatched')`,
@@ -172,7 +180,7 @@ func (fx stageOrchFixture) verdict(t *testing.T, author pgtype.UUID, body string
 	comment, err := testHandler.Queries.CreateComment(ctx, db.CreateCommentParams{
 		IssueID:     fx.Issue.ID,
 		WorkspaceID: fx.Issue.WorkspaceID,
-		AuthorType:  "agent",
+		AuthorType:  authorType,
 		AuthorID:    author,
 		Content:     body,
 		Type:        "comment",
@@ -181,7 +189,7 @@ func (fx stageOrchFixture) verdict(t *testing.T, author pgtype.UUID, body string
 		t.Fatalf("create verdict comment: %v", err)
 	}
 	issue, _ := testHandler.Queries.GetIssue(ctx, fx.Issue.ID)
-	fx.Orch.OnComment(ctx, issue, comment, "agent", uuidToString(author))
+	fx.Orch.OnComment(ctx, issue, comment, authorType, uuidToString(author))
 }
 
 // Scenario 1: dev -> in_review auto-dispatches the auditor, idempotently.
@@ -358,5 +366,111 @@ func TestOrchestrator_DisabledWhenNoConfig(t *testing.T) {
 	fx.inReview(t)
 	if got := pendingCount(t, fx.Issue.ID, fx.AuditID); got != 0 {
 		t.Fatalf("auditor dispatched while disabled: pending = %d, want 0", got)
+	}
+}
+
+// Authorization (audit stage): a VERDICT from anyone other than the dispatched
+// auditor must not advance the pipeline. Covers a non-auditor agent and a
+// member; the real auditor still advances.
+func TestOrchestrator_AuditVerdictFromNonAuditorIgnored(t *testing.T) {
+	fx := newStageOrchFixture(t)
+	fx.inReview(t) // -> audit stage, fx.AuditID dispatched
+
+	// The dev agent (not the auditor) posts PASS — must be ignored.
+	fx.verdict(t, fx.DevID, "审查 VERDICT: PASS")
+	if got := pendingCount(t, fx.Issue.ID, fx.GateID); got != 0 {
+		t.Fatalf("gate dispatched by non-auditor verdict: pending = %d, want 0", got)
+	}
+	if s := currentStage(t, fx.Issue.ID); s != service.StageAudit {
+		t.Fatalf("stage advanced on non-auditor verdict: %q, want audit", s)
+	}
+
+	// A member posts FAIL — must also be ignored (no deepdig/rework).
+	fx.verdictFrom(t, "member", parseUUID(testUserID), "结论：不通过 FAIL")
+	if got := pendingCount(t, fx.Issue.ID, fx.DigID); got != 0 {
+		t.Fatalf("deepdig dispatched by member verdict: pending = %d, want 0", got)
+	}
+	if s := currentStage(t, fx.Issue.ID); s != service.StageAudit {
+		t.Fatalf("stage advanced on member verdict: %q, want audit", s)
+	}
+
+	// The real auditor's verdict still advances to gate.
+	fx.verdict(t, fx.AuditID, "审计完成 VERDICT: PASS")
+	if got := pendingCount(t, fx.Issue.ID, fx.GateID); got != 1 {
+		t.Fatalf("auditor verdict did not dispatch gate: pending = %d, want 1", got)
+	}
+	if s := currentStage(t, fx.Issue.ID); s != service.StageGate {
+		t.Fatalf("auditor verdict did not advance: %q, want gate", s)
+	}
+}
+
+// Authorization (gate stage): a VERDICT from anyone other than the gate agent
+// must not mark the issue done or advance the pipeline.
+func TestOrchestrator_GateVerdictFromNonGateIgnored(t *testing.T) {
+	fx := newStageOrchFixture(t)
+	fx.inReview(t)
+	fx.verdict(t, fx.AuditID, "VERDICT: PASS") // -> gate stage
+
+	// The dev agent (not the gate agent) posts a gate PASS — must be ignored.
+	fx.verdict(t, fx.DevID, "门禁 VERDICT: PASS")
+	if issue, _ := testHandler.Queries.GetIssue(context.Background(), fx.Issue.ID); issue.Status == "done" {
+		t.Fatalf("issue wrongly marked done by non-gate verdict")
+	}
+	if s := currentStage(t, fx.Issue.ID); s != service.StageGate {
+		t.Fatalf("stage advanced on non-gate verdict: %q, want gate", s)
+	}
+
+	// A member posts a gate FAIL — must also be ignored (no rework).
+	fx.verdictFrom(t, "member", parseUUID(testUserID), "门禁 VERDICT: FAIL")
+	if got := pendingCount(t, fx.Issue.ID, fx.DevID); got != 0 {
+		t.Fatalf("rework dispatched by member gate verdict: pending = %d, want 0", got)
+	}
+	if s := currentStage(t, fx.Issue.ID); s != service.StageGate {
+		t.Fatalf("stage advanced on member gate verdict: %q, want gate", s)
+	}
+
+	// The real gate agent's verdict advances to done.
+	fx.verdict(t, fx.GateID, "门禁 VERDICT: PASS")
+	if s := currentStage(t, fx.Issue.ID); s != service.StageDone {
+		t.Fatalf("gate verdict did not advance: %q, want done", s)
+	}
+}
+
+// Config: an agent-level row with enabled=TRUE turns the orchestrator ON even
+// when the workspace default is disabled.
+func TestOrchestrator_AgentEnabledOverridesWorkspaceDisabled(t *testing.T) {
+	fx := newStageOrchFixture(t)
+	ctx := context.Background()
+	if _, err := testPool.Exec(ctx,
+		`UPDATE stage_orchestrator_config SET enabled = FALSE WHERE workspace_id = $1 AND agent_id IS NULL`,
+		testWorkspaceID); err != nil {
+		t.Fatalf("disable workspace config: %v", err)
+	}
+	if _, err := testPool.Exec(ctx, `
+		INSERT INTO stage_orchestrator_config (workspace_id, agent_id, enabled, actions)
+		VALUES ($1, $2, TRUE, '{}'::jsonb)`, testWorkspaceID, uuidToString(fx.DevID)); err != nil {
+		t.Fatalf("enable agent config: %v", err)
+	}
+
+	fx.inReview(t)
+	if got := pendingCount(t, fx.Issue.ID, fx.AuditID); got != 1 {
+		t.Fatalf("agent-enabled override did not dispatch auditor: pending = %d, want 1", got)
+	}
+}
+
+// Config: an agent-level row with enabled=FALSE turns the orchestrator OFF even
+// when the workspace default is enabled.
+func TestOrchestrator_AgentDisabledOverridesWorkspaceEnabled(t *testing.T) {
+	fx := newStageOrchFixture(t) // workspace enabled by default
+	ctx := context.Background()
+	if _, err := testPool.Exec(ctx, `
+		INSERT INTO stage_orchestrator_config (workspace_id, agent_id, enabled, actions)
+		VALUES ($1, $2, FALSE, '{}'::jsonb)`, testWorkspaceID, uuidToString(fx.DevID)); err != nil {
+		t.Fatalf("disable agent config: %v", err)
+	}
+
+	fx.inReview(t)
+	if got := pendingCount(t, fx.Issue.ID, fx.AuditID); got != 0 {
+		t.Fatalf("agent-disabled override still dispatched auditor: pending = %d, want 0", got)
 	}
 }

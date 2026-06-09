@@ -181,9 +181,12 @@ func (c orchConfig) actionEnabled(name string) bool {
 
 // loadConfig resolves the effective config for an issue. The workspace-default
 // row (agent_id IS NULL) is the base; a row for the controlling agent (the
-// developer) overrides enabled + merges per-action toggles. No workspace row
-// at all means the orchestrator is OFF (opt-in) so existing workspaces are
-// untouched by the rollout.
+// developer) OVERRIDES enabled and overlays per-action toggles. The agent
+// override is authoritative in both directions: an agent row with enabled=true
+// turns the orchestrator on even when the workspace default is disabled, and an
+// agent row with enabled=false turns it off even when the workspace default is
+// enabled. With neither a workspace nor an agent row the orchestrator is OFF
+// (opt-in), so existing workspaces are untouched by the rollout.
 func (o *StageOrchestrator) loadConfig(ctx context.Context, workspaceID, agentID pgtype.UUID) orchConfig {
 	rows, err := o.DB.Query(ctx, `
 		SELECT agent_id, enabled, actions
@@ -228,16 +231,22 @@ func (o *StageOrchestrator) loadConfig(ctx context.Context, workspaceID, agentID
 		slog.Warn("orchestrator: iterate config failed", "error", err)
 	}
 
-	if !haveWS {
+	if !haveWS && !haveAgent {
 		return orchConfig{enabled: false}
 	}
-	cfg := orchConfig{enabled: wsEnabled, actions: map[string]bool{}}
-	for k, v := range wsActions {
-		cfg.actions[k] = v
+	cfg := orchConfig{actions: map[string]bool{}}
+	if haveWS {
+		cfg.enabled = wsEnabled
+		for k, v := range wsActions {
+			cfg.actions[k] = v
+		}
 	}
 	if haveAgent {
-		// Agent override: AND the enabled flag, overlay action toggles.
-		cfg.enabled = cfg.enabled && agEnabled
+		// Agent override wins: the agent row's enabled flag replaces the
+		// workspace default (enabling even if the workspace is disabled, and
+		// disabling even if the workspace is enabled), and its action toggles
+		// overlay the workspace ones.
+		cfg.enabled = agEnabled
 		for k, v := range agActions {
 			cfg.actions[k] = v
 		}
@@ -363,7 +372,11 @@ func (o *StageOrchestrator) OnIssueStatusChanged(ctx context.Context, prev, issu
 
 // OnComment is the hook for new comments. It parses a VERDICT and, based on the
 // issue's current stage, advances the pipeline. System-authored comments are
-// ignored to prevent the orchestrator's own messages from re-triggering it.
+// ignored to prevent the orchestrator's own messages from re-triggering it, and
+// only the agent responsible for the current stage (the dispatched auditor in
+// the audit stage, the gate agent in the gate stage) may rule — VERDICTs from
+// any other member or agent are ignored so the state machine cannot be driven
+// by an unrelated comment.
 func (o *StageOrchestrator) OnComment(ctx context.Context, issue db.Issue, comment db.Comment, authorType, authorID string) {
 	if o == nil || o.DB == nil {
 		return
@@ -384,6 +397,14 @@ func (o *StageOrchestrator) OnComment(ctx context.Context, issue db.Issue, comme
 	}
 	cfg := o.loadConfig(ctx, issue.WorkspaceID, configAgentID(issue))
 	if !cfg.enabled {
+		return
+	}
+
+	// Authorization: only the agent owning the current stage may advance it.
+	if !o.authorizedVerdictAuthor(ctx, issue, state, authorType, authorID) {
+		slog.Info("orchestrator: ignoring VERDICT from unauthorized author",
+			"issue_id", util.UUIDToString(issue.ID), "stage", state.Stage,
+			"author_type", authorType, "author_id", authorID)
 		return
 	}
 
@@ -426,6 +447,31 @@ func (o *StageOrchestrator) OnComment(ctx context.Context, issue db.Issue, comme
 	default:
 		// dev / rework / done: a verdict here is not part of the contract.
 		return
+	}
+}
+
+// authorizedVerdictAuthor reports whether the comment author is allowed to
+// advance the pipeline at the issue's current stage. Only the dispatched
+// auditor (state.AuditAgentID) may rule in the audit stage, and only the gate
+// role agent may rule in the gate stage. Members and any other agent are never
+// authorized, so a stray "VERDICT: PASS/FAIL" in a comment cannot drive the
+// state machine. Stages with no VERDICT contract (dev/rework/done) authorize
+// no one.
+func (o *StageOrchestrator) authorizedVerdictAuthor(ctx context.Context, issue db.Issue, state stageState, authorType, authorID string) bool {
+	if authorType != "agent" || authorID == "" {
+		return false
+	}
+	switch state.Stage {
+	case StageAudit:
+		return state.AuditAgentID.Valid && util.UUIDToString(state.AuditAgentID) == authorID
+	case StageGate:
+		gate, ok := o.resolveRoleAgent(ctx, issue, roleGate)
+		if !ok {
+			return false
+		}
+		return util.UUIDToString(gate) == authorID
+	default:
+		return false
 	}
 }
 
