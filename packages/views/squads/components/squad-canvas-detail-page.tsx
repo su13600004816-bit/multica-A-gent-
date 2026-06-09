@@ -23,6 +23,7 @@ import { useT, useTimeAgo } from "../../i18n";
 import { SquadCanvasBoard } from "./squad-canvas-board";
 import { SquadTaskBoard } from "./squad-task-board";
 import { SquadCanvasTabStrip } from "./squad-canvas-tab-strip";
+import { AgentDetailDialog } from "../../agents/components/agent-detail-dialog";
 
 // Canvas orchestration page (PL-111 v2 + 增量). A canvas is a first-class entity,
 // peer to a squad: each squad owns one canvas, reachable at /<ws>/canvas/<squadId>.
@@ -105,6 +106,9 @@ export function SquadCanvasDetailPage() {
     ...squadListOptions(wsId),
     enabled: !!workspace?.id,
   });
+
+  // Agent whose 智能体详情 panel is open (clicked on the canvas). Null = closed.
+  const [openAgentId, setOpenAgentId] = useState<string | null>(null);
 
   // Explicit tab pick wins; otherwise fall back to the route squad if it's real,
   // otherwise the first squad. This keeps the deep-link from the list-page canvas
@@ -285,10 +289,20 @@ export function SquadCanvasDetailPage() {
               leaderId={squad.leader_id}
               members={members}
               getEntityName={getEntityName}
+              onSelectAgent={setOpenAgentId}
             />
           </div>
         </div>
       </div>
+
+      {/* 智能体详情 panel — opened by clicking an agent node on the canvas. */}
+      <AgentDetailDialog
+        agentId={openAgentId}
+        open={openAgentId !== null}
+        onOpenChange={(o) => {
+          if (!o) setOpenAgentId(null);
+        }}
+      />
     </div>
   );
 }

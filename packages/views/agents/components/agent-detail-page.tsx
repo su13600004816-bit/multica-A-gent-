@@ -9,23 +9,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Agent, UpdateAgentRequest } from "@multica/core/types";
-import {
-  type AgentPresenceDetail,
-  useWorkspacePresenceMap,
-} from "@multica/core/agents";
-import { api, ApiError } from "@multica/core/api";
-import { useAuthStore } from "@multica/core/auth";
+import { useQueryClient } from "@tanstack/react-query";
+import type { Agent } from "@multica/core/types";
+import type { AgentPresenceDetail } from "@multica/core/agents";
+import { api } from "@multica/core/api";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useWorkspacePaths } from "@multica/core/paths";
-import {
-  agentListOptions,
-  memberListOptions,
-  workspaceKeys,
-} from "@multica/core/workspace/queries";
-import { runtimeListOptions } from "@multica/core/runtimes";
-import { useAgentPermissions } from "@multica/core/permissions";
+import { workspaceKeys } from "@multica/core/workspace/queries";
 import { Button } from "@multica/ui/components/ui/button";
 import { CapabilityBanner } from "@multica/ui/components/common/capability-banner";
 import {
@@ -49,6 +39,7 @@ import { PageHeader } from "../../layout/page-header";
 import { availabilityConfig } from "../presence";
 import { AgentDetailInspector } from "./agent-detail-inspector";
 import { AgentOverviewPane } from "./agent-overview-pane";
+import { useAgentDetail } from "./use-agent-detail";
 import { useT } from "../../i18n";
 
 interface AgentDetailPageProps {
@@ -61,89 +52,27 @@ export function AgentDetailPage({ agentId }: AgentDetailPageProps) {
   const paths = useWorkspacePaths();
   const navigation = useNavigation();
   const qc = useQueryClient();
-  const currentUser = useAuthStore((s) => s.user);
 
+  // All identity / properties / activity data + the optimistic update flow
+  // live in the shared hook so this page and the canvas node-click dialog
+  // (PL-120) render the exact same detail surface.
   const {
-    data: agents = [],
-    isLoading: agentsLoading,
-    error: agentsError,
-    refetch: refetchAgents,
-  } = useQuery(agentListOptions(wsId));
-  const { data: runtimes = [] } = useQuery(runtimeListOptions(wsId));
-  const { data: members = [] } = useQuery(memberListOptions(wsId));
-
-  // Single workspace-level presence pass; this page just reads its slot.
-  // The hook owns the 30s tick so the failed-window auto-clears here too.
-  const { byAgent: presenceMap } = useWorkspacePresenceMap(wsId);
-
-  const agent = agents.find((a) => a.id === agentId) ?? null;
-  const presence: AgentPresenceDetail | null =
-    agent ? presenceMap.get(agent.id) ?? null : null;
-
-  // Fallback fetch: when the agent is missing from the workspace list, hit
-  // GET /api/agents/{id} directly to disambiguate "doesn't exist" (404) from
-  // "you can't see this private agent" (403). Only fires after the list has
-  // settled, so the common path makes zero extra requests.
-  const { error: detailError } = useQuery({
-    queryKey: ["agent-detail-probe", wsId, agentId],
-    queryFn: () => api.getAgent(agentId),
-    enabled: !agentsLoading && !agent && !!agentId,
-    retry: false,
-  });
-  const isForbidden =
-    detailError instanceof ApiError && detailError.status === 403;
-
-  // Permission hook MUST be called unconditionally — its `agent | null`
-  // signature handles the not-found / loading case internally so the early
-  // returns below don't violate the rules of hooks. Backend gates archive
-  // and restore identically to edit, so a single `canEdit` covers them all.
-  const { canEdit } = useAgentPermissions(agent, wsId);
+    agent,
+    agentsLoading,
+    agentsError,
+    refetchAgents,
+    runtimes,
+    members,
+    presence,
+    runtime,
+    owner,
+    currentUserId,
+    canEdit,
+    isForbidden,
+    handleUpdate,
+  } = useAgentDetail(agentId);
 
   const [confirmArchive, setConfirmArchive] = useState(false);
-
-  const handleUpdate = async (id: string, data: Record<string, unknown>) => {
-    // Optimistic update: patch the matching agent in the cached list
-    // BEFORE the network round-trip so the inspector picker chips flip to
-    // the new value immediately on click. Without this, every inspector
-    // picker (thinking / visibility / concurrency / model / runtime) waits
-    // 0.5-2s for the API response + invalidate + refetch before the trigger
-    // updates — readable as obvious lag in the UI.
-    //
-    // On error we rollback only the fields THIS call wrote, leaving any
-    // other concurrently-mutated fields untouched, then invalidate so the
-    // cache converges with the server. A whole-list snapshot rollback
-    // would clobber a concurrent successful mutation if the failing call
-    // resolves last (e.g. flipping visibility then runtime simultaneously
-    // and only the visibility PATCH fails).
-    const queryKey = workspaceKeys.agents(wsId);
-    const prevAgents = qc.getQueryData<Agent[]>(queryKey);
-    const prevAgent = prevAgents?.find((a) => a.id === id);
-    const prevFields: Record<string, unknown> = {};
-    if (prevAgent) {
-      for (const key of Object.keys(data)) {
-        prevFields[key] = (prevAgent as unknown as Record<string, unknown>)[key];
-      }
-    }
-    qc.setQueryData<Agent[]>(queryKey, (old) =>
-      old?.map((a) => (a.id === id ? ({ ...a, ...data } as Agent) : a)),
-    );
-    try {
-      await api.updateAgent(id, data as UpdateAgentRequest);
-      qc.invalidateQueries({ queryKey });
-      toast.success(t(($) => $.detail.agent_updated_toast));
-    } catch (e) {
-      if (prevAgent) {
-        qc.setQueryData<Agent[]>(queryKey, (old) =>
-          old?.map((a) =>
-            a.id === id ? ({ ...a, ...prevFields } as Agent) : a,
-          ),
-        );
-      }
-      qc.invalidateQueries({ queryKey });
-      toast.error(e instanceof Error ? e.message : t(($) => $.detail.update_failed_toast));
-      throw e;
-    }
-  };
 
   const handleArchive = async (id: string) => {
     try {
@@ -233,12 +162,6 @@ export function AgentDetailPage({ agentId }: AgentDetailPageProps) {
   }
 
   const isArchived = !!agent.archived_at;
-  const runtime = agent.runtime_id
-    ? runtimes.find((r) => r.id === agent.runtime_id) ?? null
-    : null;
-  const owner = agent.owner_id
-    ? members.find((m) => m.user_id === agent.owner_id) ?? null
-    : null;
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
@@ -287,7 +210,7 @@ export function AgentDetailPage({ agentId }: AgentDetailPageProps) {
           presence={presence}
           runtimes={runtimes}
           members={members}
-          currentUserId={currentUser?.id ?? null}
+          currentUserId={currentUserId}
           canEdit={canEdit.allowed}
           onUpdate={handleUpdate}
         />
