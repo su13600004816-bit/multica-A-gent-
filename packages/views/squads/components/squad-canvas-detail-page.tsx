@@ -1,13 +1,18 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Squad, SquadMember, Agent } from "@multica/core/types";
 import { api } from "@multica/core/api";
 import { useCurrentWorkspace, useWorkspacePaths } from "@multica/core/paths";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { resolvePublicFileUrl } from "@multica/core/workspace/avatar-url";
-import { agentListOptions, memberListOptions, workspaceKeys } from "@multica/core/workspace/queries";
+import {
+  agentListOptions,
+  memberListOptions,
+  squadListOptions,
+  workspaceKeys,
+} from "@multica/core/workspace/queries";
 import { Users } from "lucide-react";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { ActorAvatar as ActorAvatarBase } from "@multica/ui/components/common/actor-avatar";
@@ -17,15 +22,22 @@ import { BreadcrumbHeader } from "../../layout/breadcrumb-header";
 import { useT, useTimeAgo } from "../../i18n";
 import { SquadCanvasBoard } from "./squad-canvas-board";
 import { SquadTaskBoard } from "./squad-task-board";
+import { SquadCanvasTabStrip } from "./squad-canvas-tab-strip";
 
-// Canvas orchestration page (PL-111 v2). A canvas is a first-class entity, peer
-// to a squad: each squad owns one canvas, reachable at /<ws>/canvas/<squadId>.
+// Canvas orchestration page (PL-111 v2 + 增量). A canvas is a first-class entity,
+// peer to a squad: each squad owns one canvas, reachable at /<ws>/canvas/<squadId>.
 // The page mirrors the squad DETAIL surface — breadcrumb + left detail bar +
-// right main panel — so it reads as native Multica chrome. The left bar is split
-// into two stacked blocks (上块 小队成员区 / 下块 小线任务看板); the right main
-// panel is one full-bleed, manually-editable ReactFlow board with a bottom
-// 画布编排工具栏. No backend canvas store yet, so the board seeds from the squad +
-// its members and edits live in-session.
+// right main panel — so it reads as native Multica chrome.
+//
+// A top 小队头像 tab strip (one tab per existing squad) lets you switch the WHOLE
+// page between squads without navigating: picking a tab re-points ①小队详情 /
+// ②成员列表 / ③小线任务看板 / ④ReactFlow 画布 at that squad. The active squad is
+// seeded from the route id (the canvas card that was clicked) and can then be
+// changed in-session via the strip. The left bar is split into two stacked blocks
+// (上块 小队成员区 / 下块 小线任务看板); the right main panel is one full-bleed,
+// manually-editable ReactFlow board with a bottom 画布编排工具栏. No backend canvas
+// store yet, so the board seeds from the selected squad + its members and edits
+// live in-session.
 
 function InspectorRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -84,19 +96,35 @@ export function SquadCanvasDetailPage() {
   const wsId = useWorkspaceId();
   const p = useWorkspacePaths();
   const { pathname } = useNavigation();
-  // Route is /<ws>/canvas/<squadId> — the canvas is keyed by its squad.
-  const squadId = pathname.split("/").pop() ?? "";
+  // Route is /<ws>/canvas/<squadId> — the canvas is keyed by its squad. This is
+  // only the INITIAL selection; the tab strip can re-point the page in-session.
+  const routeSquadId = pathname.split("/").pop() ?? "";
 
-  const { data: squad } = useQuery<Squad>({
-    queryKey: [...workspaceKeys.squads(wsId), squadId],
-    queryFn: () => api.getSquad(squadId),
-    enabled: !!workspace?.id && !!squadId,
+  // All squads drive the avatar tab strip (one tab per existing squad).
+  const { data: squads = [] } = useQuery({
+    ...squadListOptions(wsId),
+    enabled: !!workspace?.id,
   });
 
+  // Explicit tab pick wins; otherwise fall back to the route squad if it's real,
+  // otherwise the first squad. This keeps the deep-link from the list-page canvas
+  // card working while still allowing in-session switching.
+  const [pickedSquadId, setPickedSquadId] = useState<string | null>(null);
+  const activeSquadId = useMemo(() => {
+    if (pickedSquadId && squads.some((s) => s.id === pickedSquadId)) return pickedSquadId;
+    if (squads.some((s) => s.id === routeSquadId)) return routeSquadId;
+    return squads[0]?.id ?? routeSquadId;
+  }, [pickedSquadId, squads, routeSquadId]);
+
+  const squad = useMemo<Squad | undefined>(
+    () => squads.find((s) => s.id === activeSquadId),
+    [squads, activeSquadId],
+  );
+
   const { data: members = [] } = useQuery<SquadMember[]>({
-    queryKey: [...workspaceKeys.squads(wsId), squadId, "members"],
-    queryFn: () => api.listSquadMembers(squadId),
-    enabled: !!workspace?.id && !!squadId,
+    queryKey: [...workspaceKeys.squads(wsId), activeSquadId, "members"],
+    queryFn: () => api.listSquadMembers(activeSquadId),
+    enabled: !!workspace?.id && !!activeSquadId,
   });
 
   const { data: agents = [] } = useQuery(agentListOptions(wsId));
@@ -141,6 +169,16 @@ export function SquadCanvasDetailPage() {
           panel. The main panel is one full-bleed, editable canvas box. */}
       <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-3 md:grid md:grid-cols-[280px_minmax(0,1fr)] md:gap-4 md:overflow-hidden md:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="flex w-full flex-col rounded-lg border bg-background md:h-full md:min-h-0 md:overflow-hidden">
+          {/* 小队头像 tab 排 — switches every block + the canvas to the picked squad */}
+          {squads.length > 1 && (
+            <SquadCanvasTabStrip
+              squads={squads}
+              activeSquadId={activeSquadId}
+              onSelect={setPickedSquadId}
+              label={t(($) => $.canvas_page.squad_switcher)}
+            />
+          )}
+
           {/* 上块 — 小队成员区 (identity + details + member list) */}
           <div className="flex min-h-0 flex-col md:flex-[3] md:overflow-y-auto">
             {/* Identity */}

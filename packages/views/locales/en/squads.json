@@ -23,6 +23,7 @@
     "card_hint": "Open the canvas workbench",
     "breadcrumb_root": "Canvas",
     "breadcrumb_leaf": "Canvas Workbench",
+    "squad_switcher": "Squads",
     "members_section": "Squad Members",
     "board_section": "Line Task Board",
     "board_empty": "No tasks linked to this squad yet",
