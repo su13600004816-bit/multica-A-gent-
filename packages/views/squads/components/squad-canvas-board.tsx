@@ -29,6 +29,11 @@ import { issueListOptions } from "@multica/core/issues";
 import { STATUS_CONFIG } from "@multica/core/issues/config";
 import { useWorkspaceId } from "@multica/core/hooks";
 import type { Issue, IssueStatus, SquadMember } from "@multica/core/types";
+
+// Stable empty default so `allIssues` keeps a constant reference while the query is
+// loading/idle — otherwise a fresh [] each render re-computes statusByNodeId and
+// drives the live-status effect into an infinite setState loop (React #185).
+const EMPTY_ISSUES: Issue[] = [];
 import { ActorAvatar } from "../../common/actor-avatar";
 import { useT } from "../../i18n";
 
@@ -310,7 +315,7 @@ function SquadCanvasFlow({
   const subtitle = t(($) => $.canvas_tab.root_subtitle, { count: members.length });
 
   // Same board feed the 任务看板 uses, so node/edge status matches the panel.
-  const { data: allIssues = [] } = useQuery({
+  const { data: allIssues = EMPTY_ISSUES } = useQuery({
     ...issueListOptions(wsId),
     enabled: !!wsId,
   });
