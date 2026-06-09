@@ -55,37 +55,34 @@ comment 原文，只新增摘要 + 翻转可空标记列。**
   `ListMemoryArchivesByScope`、`GetLatestMemoryArchiveLevel`
   （`pkg/db/queries/memory_archive.sql`，需 `sqlc generate`）。
 
-## 待接线（trigger 侧，本分支未改动关键事务路径，按下列步骤接入）
+## D 已落地（trigger 侧，本轮接线，已 build+test 通过）
+- **归档服务** `internal/service/memory_archive.go` `MemoryArchiveService`：
+  读 issue 评论 → `Compactor`（Qwen/deterministic）→ 落 T1..T4 → 标记
+  `issue.memory_compacted_at`，事务内、fail-safe；`dbArchiveStore` 适配
+  `db.Queries`，`commentsToMessages` 转换。
+- **issue 完成后归档** `service/task.go` `CompleteTask`：post-commit 最佳努力调用
+  `ArchiveIssue`（失败仅告警，不动原文、不回滚任务）。
+- **构造接线** `handler/handler.go`：`taskSvc.Memory = NewDefaultMemoryArchiveService(...)`。
+- **claim 注入** `handler/daemon.go`：issue 已归档时设 `resp.MemorySummary`（T1+T2）。
+- **DTO 透传** `agent.go` / `daemon/types.go`：新增 `memory_summary` 字段
+  （server→daemon JSON 透传，无需手动 mapping）。
+- **prompt 收敛** `daemon/prompt.go`：assignment 分支带 summary 时注入 T1/T2、
+  不再要求全量 2000 条；原文不删，必要时逐级下探。
+- **测试**：`prompt_test`（compacted 注入 / 未 compacted 保留全量）、
+  `memory_archive_test`（转换/nil-safe）、`memorycompact`(15)；`go build ./...` 绿；
+  handler/daemon/service 全套件无回归。
 
-> 故意没有盲改 `CompleteTask`/`FailTask` 这种关键事务路径：本沙箱无 Go/sqlc/psql
-> 工具链，无法编译/跑测试，盲改有删数据风险（见 issue 的"不要删除生产数据"）。
-> 以下为精确接线点。
+## 仍待接线（下一批）
 
-1. **Store adapter**（新文件 `internal/service/memory_store.go`）：实现
-   `memorycompact.Store`，`SaveArchive` → `Queries.CreateMemoryArchive`，
-   `MarkCompacted` → 按 scope 调 `MarkChatSessionCompacted` /
-   `MarkIssueMemoryCompacted`。用 `qtx`（事务内）构造。
+1. **C. chat 超阈值止血** — `handler/chat.go` `SendChatMessage` 入口：按
+   `bytes/comment_count/token_estimate` 判阈值，超阈值对旧 `chat_session` 调
+   `MemoryArchiveService.ArchiveChatSession`（内部 `MarkChatSessionCompacted`
+   清空 session_id/work_dir 并盖 compacted_at）。claim gate 已就绪，缺触发。
 
-2. **D. issue 完成后归档** — `service/task.go` `CompleteTask`，在
-   `UpdateChatSessionSession` 之后、commit 之前：拉取该 issue 的 comment 作为
-   `memorycompact.Message`，`Archiver.Archive(ctx, Input{ScopeType:"issue",...})`。
-   失败只记日志，不回滚原 commit（fail-safe）。
+2. **D. 小队 leader 自触发循环** — 当前归档**不发任何评论**（纯 DB 行），无自触发风险；
+   若将来要发归档播报评论，用 `author_type='system'` 且不带 `mention://agent|squad`。
 
-3. **C. chat 超阈值止血** — `handler/chat.go` `SendChatMessage` 入口：按
-   `bytes/comment_count/token_estimate` 判阈值，超阈值则对旧 `chat_session` 调
-   `Archiver.Archive(ScopeType:"chat_session")`（内部 `MarkChatSessionCompacted`
-   会清空 session_id/work_dir 并盖 compacted_at）。下一条消息 claim 即 fresh。
-
-4. **D. prompt 收敛** — `daemon/prompt.go` `BuildPrompt`：assignment 分支若 issue
-   已 compacted，不再要求 `comment list` 全量 2000 条，改为提示"先读 T1/T2
-   归档摘要（`multica issue ... ` 或注入内容），必要时逐级下探 T3/T4"。
-   需把 `issue.memory_compacted_at` 透传进 `Task`。
-
-5. **D. 小队 leader 自触发循环** — 归档系统评论用 `author_type='system'`
-   （migration 107 已支持），且不带 `mention://agent|squad`，`handler/comment.go`
-   的唤醒链路据此跳过，避免 leader/agent 被归档评论再次叫醒。
-
-6. **E. retry 连续失败 fresh** — 已有 `CreateRetryTask` 对
+3. **E. retry 连续失败 fresh** — 已有 `CreateRetryTask` 对
    `codex_semantic_inactivity` 置 `force_fresh_session`；扩展为连续 N 次失败也置位。
 
 ## 构建 / 测试（已在 go1.26.1 + sqlc v1.31.1 下跑通）

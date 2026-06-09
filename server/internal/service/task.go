@@ -30,6 +30,11 @@ type TaskService struct {
 	Bus       *events.Bus
 	Analytics analytics.Client
 	Wakeup    TaskWakeupNotifier
+	// Memory archives an issue's history on completion and marks it
+	// compacted so the next task on the issue starts a fresh session
+	// (PL-91). Optional — nil disables archiving and leaves session-resume
+	// behaviour unchanged.
+	Memory *MemoryArchiveService
 	// EmptyClaim caches "this runtime has no queued task" so the daemon
 	// poll path can skip a Postgres scan on the steady-state empty case.
 	// Optional — a nil cache disables the fast path and every claim
@@ -1129,6 +1134,24 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, resu
 					}
 				}
 			}
+		}
+	}
+
+	// Issue memory archive (PL-91). After a completed issue task, compact
+	// the issue's history into T1..T4 and mark it memory-compacted so the
+	// next task on this issue starts a fresh session carrying only the
+	// injected low-gradient summary — the core token 止血. Best-effort and
+	// post-commit: the task is already durably completed, originals are never
+	// touched, and a failure here only means the old (more expensive) resume
+	// behaviour persists for one more turn.
+	if task.IssueID.Valid && s.Memory != nil {
+		if err := s.Memory.ArchiveIssue(ctx, task.IssueID, task.AgentID); err != nil {
+			slog.Warn("issue memory archive failed (non-fatal)",
+				"task_id", util.UUIDToString(task.ID),
+				"issue_id", util.UUIDToString(task.IssueID),
+				"agent_id", util.UUIDToString(task.AgentID),
+				"error", err,
+			)
 		}
 	}
 
