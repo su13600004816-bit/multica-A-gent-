@@ -2,8 +2,21 @@
   "page": {
     "title": "Squads",
     "new_button": "New Squad",
+    "new_canvas_button": "New Canvas",
     "empty_no_squads": "No squads yet. Create one to get started.",
     "empty_no_match": "No squads match your filters."
+  },
+  "new_canvas_dialog": {
+    "title": "New Canvas",
+    "description": "Pick a squad to open its canvas. Each squad has its own canvas.",
+    "search_placeholder": "Search squads…",
+    "empty": "No squads yet. Create a squad first — it comes with its own canvas.",
+    "cancel": "Cancel"
+  },
+  "canvas_tab": {
+    "board_title": "{{name}} Canvas",
+    "root_subtitle_one": "{{count}} member",
+    "root_subtitle_other": "{{count}} members"
   },
   "inspector": {
     "details_section": "Details",
