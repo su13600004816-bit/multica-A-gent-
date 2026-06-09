@@ -280,6 +280,7 @@ export function SquadCanvasDetailPage() {
         <div className="flex min-h-[60vh] flex-col overflow-hidden rounded-lg border bg-background md:h-full md:min-h-0">
           <div className="h-full p-3 md:p-4">
             <SquadCanvasBoard
+              squadId={squad.id}
               squadName={squad.name}
               squadAvatarUrl={squad.avatar_url}
               leaderId={squad.leader_id}
