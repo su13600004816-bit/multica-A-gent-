@@ -1351,6 +1351,16 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+
+		// PL-91: inject the low-gradient T1/T2 summary for a memory-compacted
+		// issue so the fresh session has context without the prompt demanding a
+		// full comment-history read. Best-effort; empty until the issue has
+		// been archived (i.e. only set once compaction has happened).
+		if h.TaskService != nil && h.TaskService.Memory != nil {
+			if summary := h.TaskService.Memory.IssueMemorySummary(r.Context(), task.IssueID); summary != "" {
+				resp.MemorySummary = summary
+			}
+		}
 	}
 
 	// Chat task: populate workspace/session info from the chat_session table.

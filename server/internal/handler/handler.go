@@ -132,6 +132,10 @@ func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *event
 
 	taskSvc := service.NewTaskService(queries, txStarter, hub, bus, daemonHub)
 	taskSvc.Analytics = analyticsClient
+	// PL-91: archive an issue's memory on task completion and force a fresh
+	// session on the next claim. Uses Qwen when DASHSCOPE_API_KEY is set,
+	// else the deterministic fail-safe.
+	taskSvc.Memory = service.NewDefaultMemoryArchiveService(queries, txStarter)
 	return &Handler{
 		Queries:               queries,
 		DB:                    executor,
