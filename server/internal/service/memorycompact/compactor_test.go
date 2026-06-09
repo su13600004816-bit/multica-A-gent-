@@ -78,6 +78,50 @@ func TestDeterministicCompact_KeyLinesSurfaceDecisions(t *testing.T) {
 	}
 }
 
+func TestDeterministicCompact_CarriesPriorSummaryIntoInjectedLevels(t *testing.T) {
+	in := Input{
+		ScopeType: "chat_session",
+		ScopeID:   "chat-1",
+		Messages: []Message{
+			{
+				Author:    "memory_archive",
+				Role:      "system",
+				Content:   "Previous compacted memory summary:\nT1 old decision: use OAuth.\n\nT2 old blocker resolved.",
+				CreatedAt: ts("2026-06-01 10:00"),
+			},
+			{
+				Author:    "user",
+				Role:      "user",
+				Content:   "New follow-up: verify mobile login.",
+				CreatedAt: ts("2026-06-01 10:10"),
+			},
+		},
+	}
+
+	lv, err := DeterministicCompactor{}.Compact(context.Background(), in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if lv.Count != 1 {
+		t.Errorf("source count must exclude synthetic carried summary, got %d", lv.Count)
+	}
+	if !lv.SourceFrom.Equal(ts("2026-06-01 10:10")) || !lv.SourceTo.Equal(ts("2026-06-01 10:10")) {
+		t.Errorf("source window must be the new real-message window, got %v -> %v", lv.SourceFrom, lv.SourceTo)
+	}
+	if !strings.Contains(lv.T1, "Previous compacted summary carried forward") {
+		t.Errorf("T1 must state prior memory was carried, got:\n%s", lv.T1)
+	}
+	if !strings.Contains(lv.T2, "T1 old decision: use OAuth") {
+		t.Errorf("T2 must include carried prior summary, got:\n%s", lv.T2)
+	}
+	if !strings.Contains(lv.T2, "1 new records") {
+		t.Errorf("T2 should label active-window records as new, got:\n%s", lv.T2)
+	}
+	if !strings.Contains(lv.T3, "memory_archive") || !strings.Contains(lv.T4, "memory_archive") {
+		t.Errorf("T3/T4 should keep the carried summary for drill-down")
+	}
+}
+
 func TestDeterministicCompact_Empty(t *testing.T) {
 	lv, err := DeterministicCompactor{}.Compact(context.Background(), Input{ScopeType: "chat_session", ScopeID: "x"})
 	if err != nil {
@@ -93,12 +137,18 @@ func TestDeterministicCompact_Empty(t *testing.T) {
 // fakeModel returns canned summaries, optionally failing on some levels.
 type fakeModel struct {
 	failLevels map[Level]bool
+	outputs    map[Level]string
 }
 
 func (f fakeModel) ID() string { return "fake-qwen" }
 func (f fakeModel) Summarize(_ context.Context, lv Level, _ []Message) (string, error) {
 	if f.failLevels[lv] {
 		return "", errors.New("model unavailable")
+	}
+	if f.outputs != nil {
+		if out, ok := f.outputs[lv]; ok {
+			return out, nil
+		}
 	}
 	return "MODEL " + string(lv), nil
 }
@@ -130,6 +180,9 @@ func TestModelCompactor_FallsBackPerLevel(t *testing.T) {
 	if strings.TrimSpace(lv.T4) == "" || strings.HasPrefix(lv.T4, "MODEL") {
 		t.Errorf("T4 should fall back to deterministic, got %q", lv.T4)
 	}
+	if lv.Generator != "mixed:fake-qwen+deterministic" {
+		t.Errorf("generator = %q, want mixed marker for partial fallback", lv.Generator)
+	}
 }
 
 func TestModelCompactor_AllModelFailuresMarkDeterministic(t *testing.T) {
@@ -142,13 +195,33 @@ func TestModelCompactor_AllModelFailuresMarkDeterministic(t *testing.T) {
 	}
 }
 
+func TestModelCompactor_BoundsModelOutputByLevel(t *testing.T) {
+	mc := ModelCompactor{Client: fakeModel{outputs: map[Level]string{
+		LevelT1: strings.Repeat("x", modelT1MaxRunes+50),
+		LevelT2: strings.Repeat("y", modelT2MaxRunes+50),
+	}}}
+	lv, err := mc.Compact(context.Background(), sampleInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := len([]rune(lv.T1)); got != modelT1MaxRunes {
+		t.Errorf("T1 length = %d, want cap %d", got, modelT1MaxRunes)
+	}
+	if got := len([]rune(lv.T2)); got != modelT2MaxRunes {
+		t.Errorf("T2 length = %d, want cap %d", got, modelT2MaxRunes)
+	}
+	if !strings.HasSuffix(lv.T1, "…") || !strings.HasSuffix(lv.T2, "…") {
+		t.Errorf("capped model outputs should end with ellipsis: T1 suffix=%q T2 suffix=%q", lv.T1[len(lv.T1)-1:], lv.T2[len(lv.T2)-1:])
+	}
+}
+
 // recordingStore captures Archiver side effects.
 type recordingStore struct {
-	saved        []ArchiveRecord
-	marked       []string
-	failSaveAt   int
-	saveCalls    int
-	failMark     bool
+	saved      []ArchiveRecord
+	marked     []string
+	failSaveAt int
+	saveCalls  int
+	failMark   bool
 }
 
 func (s *recordingStore) SaveArchive(_ context.Context, rec ArchiveRecord) error {

@@ -1054,28 +1054,28 @@ func logClaimEndpointSlow(runtimeID, outcome string, start time.Time, authMs, cl
 	)
 }
 
-// sessionResumeBlocked reports whether the daemon must start a FRESH agent
-// session for this task instead of resuming a prior one (PL-91). It returns
-// true when an operator disabled session resume for the agent/workspace, or
-// when the issue's memory was compacted.
+// sessionResumeBlockReason reports why the daemon must start a FRESH agent
+// session for this task instead of resuming a prior one (PL-91). It returns a
+// stable empty/non-empty reason when an operator disabled session resume for
+// the agent/workspace, or when the issue's memory was compacted.
 //
 // Checks are best-effort and fail OPEN: on any lookup error we return false
 // and keep the historical resume behaviour, because a failed check must never
 // strand a task without its conversation context. Pass an invalid issueID for
 // chat tasks (chat compaction is read directly from chat_session.compacted_at
 // by the caller).
-func (h *Handler) sessionResumeBlocked(ctx context.Context, agentID, issueID pgtype.UUID) bool {
+func (h *Handler) sessionResumeBlockReason(ctx context.Context, agentID, issueID pgtype.UUID) string {
 	if agentID.Valid {
 		if enabled, err := h.Queries.GetAgentSessionResumeEnabled(ctx, agentID); err == nil && !enabled {
-			return true
+			return "session_resume_disabled"
 		}
 	}
 	if issueID.Valid {
 		if at, err := h.Queries.GetIssueMemoryCompactedAt(ctx, issueID); err == nil && at.Valid {
-			return true
+			return "issue_memory_compacted"
 		}
 	}
-	return false
+	return ""
 }
 
 // ClaimTaskByRuntime atomically claims the next queued task for a runtime.
@@ -1332,7 +1332,16 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		// operator disabled session resume for this agent/workspace: in both
 		// cases the next task must start fresh and rely on the injected T1/T2
 		// summary instead of re-ingesting the old provider session.
-		if !task.ForceFreshSession && !h.sessionResumeBlocked(r.Context(), task.AgentID, task.IssueID) {
+		resumeBlockReason := ""
+		if task.ForceFreshSession {
+			resumeBlockReason = "force_fresh_session"
+		} else {
+			resumeBlockReason = h.sessionResumeBlockReason(r.Context(), task.AgentID, task.IssueID)
+		}
+		if resumeBlockReason != "" {
+			resp.ResumeBlockedReason = resumeBlockReason
+		}
+		if resumeBlockReason == "" {
 			if prior, err := h.Queries.GetLastTaskSession(r.Context(), db.GetLastTaskSessionParams{
 				AgentID: task.AgentID,
 				IssueID: task.IssueID,
@@ -1359,6 +1368,7 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		if h.TaskService != nil && h.TaskService.Memory != nil {
 			if summary := h.TaskService.Memory.IssueMemorySummary(r.Context(), task.IssueID); summary != "" {
 				resp.MemorySummary = summary
+				resp.MemorySummaryScope = "issue"
 			}
 		}
 	}
@@ -1374,8 +1384,16 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 					resp.Repos = repos
 				}
 			}
-			if !task.ForceFreshSession &&
-				!h.sessionResumeBlocked(r.Context(), task.AgentID, pgtype.UUID{}) {
+			resumeBlockReason := ""
+			if task.ForceFreshSession {
+				resumeBlockReason = "force_fresh_session"
+			} else {
+				resumeBlockReason = h.sessionResumeBlockReason(r.Context(), task.AgentID, pgtype.UUID{})
+			}
+			if resumeBlockReason != "" {
+				resp.ResumeBlockedReason = resumeBlockReason
+			}
+			if resumeBlockReason == "" {
 				// Resume chat sessions only when the stored pointer was produced
 				// by the same runtime as the claiming task. PL-91: when a session
 				// was compacted, MarkChatSessionCompacted cleared its
@@ -1404,6 +1422,8 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 							resp.PriorWorkDir = prior.WorkDir.String
 						}
 					}
+				} else if resp.PriorSessionID == "" && resp.PriorWorkDir == "" {
+					resp.ResumeBlockedReason = "chat_memory_compacted"
 				}
 			}
 			// PL-91: after a chat session is compacted, the fresh provider
@@ -1414,6 +1434,7 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 			if cs.CompactedAt.Valid && h.TaskService != nil && h.TaskService.Memory != nil {
 				if summary := h.TaskService.Memory.ChatSessionMemorySummary(r.Context(), cs.ID); summary != "" {
 					resp.MemorySummary = summary
+					resp.MemorySummaryScope = "chat_session"
 				}
 			}
 			// Load the latest user message for the chat prompt, plus any
@@ -1686,7 +1707,7 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		resp.AuthToken = tokenStr
 	}
 
-	slog.Info("task claimed by runtime", "task_id", uuidToString(task.ID), "runtime_id", runtimeID, "agent_id", uuidToString(task.AgentID), "prior_session", resp.PriorSessionID)
+	slog.Info("task claimed by runtime", "task_id", uuidToString(task.ID), "runtime_id", runtimeID, "agent_id", uuidToString(task.AgentID), "prior_session", resp.PriorSessionID, "resume_blocked_reason", resp.ResumeBlockedReason, "memory_summary_scope", resp.MemorySummaryScope)
 	writeJSON(w, http.StatusOK, map[string]any{"task": resp})
 }
 

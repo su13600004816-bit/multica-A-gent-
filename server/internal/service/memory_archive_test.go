@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/multica-ai/multica/server/internal/service/memorycompact"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
@@ -135,6 +136,35 @@ func TestFilterChatSince(t *testing.T) {
 	// Input must not be mutated.
 	if rows[0].Content != "old" {
 		t.Errorf("filterChatSince mutated its input")
+	}
+}
+
+func TestPrependPriorSummary(t *testing.T) {
+	t0 := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	msgs := []memorycompact.Message{{
+		Author:    "user",
+		Role:      "user",
+		Content:   "new active-window message",
+		CreatedAt: t0.Add(time.Minute),
+	}}
+
+	got := prependPriorSummary("T1 old\n\nT2 old", pgtype.Timestamptz{Time: t0, Valid: true}, msgs)
+	if len(got) != 2 {
+		t.Fatalf("expected prior summary + original message, got %d", len(got))
+	}
+	if got[0].Author != "memory_archive" || got[0].Role != "system" {
+		t.Fatalf("prior summary message identity wrong: %+v", got[0])
+	}
+	if got[0].Content != "Previous compacted memory summary:\nT1 old\n\nT2 old" {
+		t.Errorf("prior summary content = %q", got[0].Content)
+	}
+	if got[1].Content != "new active-window message" {
+		t.Errorf("original message not preserved: %+v", got[1])
+	}
+
+	unchanged := prependPriorSummary("   ", pgtype.Timestamptz{Time: t0, Valid: true}, msgs)
+	if len(unchanged) != 1 || unchanged[0].Content != msgs[0].Content {
+		t.Errorf("blank prior summary should leave messages unchanged: %+v", unchanged)
 	}
 }
 

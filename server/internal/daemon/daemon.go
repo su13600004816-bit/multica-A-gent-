@@ -2123,6 +2123,9 @@ func (d *Daemon) handleTask(ctx context.Context, task Task, slot int) {
 		"trigger_comment_id", task.TriggerCommentID,
 		"resume_session", task.PriorSessionID != "",
 		"reuse_workdir", task.PriorWorkDir != "",
+		"resume_blocked_reason", task.ResumeBlockedReason,
+		"memory_summary_present", strings.TrimSpace(task.MemorySummary) != "",
+		"memory_summary_scope", task.MemorySummaryScope,
 	)
 
 	// If the task targets a project_resource of type local_directory that

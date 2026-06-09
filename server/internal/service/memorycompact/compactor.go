@@ -115,6 +115,13 @@ type DeterministicCompactor struct {
 const (
 	defaultT4Cap = 600
 	defaultT3Cap = 160
+
+	modelT1MaxRunes = 800
+	modelT2MaxRunes = 2400
+	modelT3MaxRunes = 12000
+	modelT4MaxRunes = 30000
+
+	priorSummaryPrefix = "Previous compacted memory summary:"
 )
 
 // Compact implements Compactor. It always returns a nil error.
@@ -124,12 +131,16 @@ func (d DeterministicCompactor) Compact(_ context.Context, in Input) (Levels, er
 
 func (d DeterministicCompactor) render(in Input, generator string) Levels {
 	msgs := normalize(in.Messages)
-	from, to := window(msgs)
+	source := sourceMessages(msgs)
+	if len(source) == 0 {
+		source = msgs
+	}
+	from, to := window(source)
 	lv := Levels{
 		Generator:  generator,
 		SourceFrom: from,
 		SourceTo:   to,
-		Count:      len(msgs),
+		Count:      len(source),
 	}
 	if len(msgs) == 0 {
 		lv.T1 = "(empty conversation; nothing to archive)"
@@ -148,8 +159,8 @@ func (d DeterministicCompactor) render(in Input, generator string) Levels {
 
 	lv.T4 = renderDigest(msgs, t4Cap)
 	lv.T3 = renderDigest(msgs, t3Cap)
-	lv.T2 = renderT2(in.ScopeType, msgs, from, to)
-	lv.T1 = renderT1(in.ScopeType, msgs, from, to)
+	lv.T2 = renderT2(in.ScopeType, msgs, source, from, to)
+	lv.T1 = renderT1(in.ScopeType, msgs, source, from, to)
 	return lv
 }
 
@@ -164,16 +175,20 @@ func renderDigest(msgs []Message, limit int) string {
 
 // renderT2 is a short structured summary: window, participants, turn counts,
 // and any lines that look like decisions / blockers / outcomes.
-func renderT2(scope string, msgs []Message, from, to time.Time) string {
+func renderT2(scope string, msgs, source []Message, from, to time.Time) string {
 	roleCount := map[string]int{}
 	participants := map[string]struct{}{}
-	for _, m := range msgs {
+	for _, m := range source {
 		roleCount[strings.ToLower(m.Role)]++
 		participants[speaker(m)] = struct{}{}
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Scope: %s | %d records | %s -> %s\n",
-		scope, len(msgs), from.UTC().Format("2006-01-02 15:04"), to.UTC().Format("2006-01-02 15:04"))
+	recordLabel := "records"
+	if len(carriedPriorSummaries(msgs)) > 0 {
+		recordLabel = "new records"
+	}
+	fmt.Fprintf(&b, "Scope: %s | %d %s | %s -> %s\n",
+		scope, len(source), recordLabel, from.UTC().Format("2006-01-02 15:04"), to.UTC().Format("2006-01-02 15:04"))
 	fmt.Fprintf(&b, "Participants: %s\n", strings.Join(sortedKeys(participants), ", "))
 
 	roles := make([]string, 0, len(roleCount))
@@ -187,7 +202,14 @@ func renderT2(scope string, msgs []Message, from, to time.Time) string {
 	}
 	fmt.Fprintf(&b, "Turns: %s\n", strings.Join(parts, " "))
 
-	if highlights := keyLines(msgs, 8); len(highlights) > 0 {
+	if prior := carriedPriorSummaries(msgs); len(prior) > 0 {
+		b.WriteString("Carried prior memory:\n")
+		for _, p := range prior {
+			fmt.Fprintf(&b, "- %s\n", truncate(collapse(p), 500))
+		}
+	}
+
+	if highlights := keyLines(source, 8); len(highlights) > 0 {
 		b.WriteString("Key points:\n")
 		for _, h := range highlights {
 			fmt.Fprintf(&b, "- %s\n", h)
@@ -197,13 +219,20 @@ func renderT2(scope string, msgs []Message, from, to time.Time) string {
 }
 
 // renderT1 is the one-paragraph headline injected into every fresh session.
-func renderT1(scope string, msgs []Message, from, to time.Time) string {
-	last := msgs[len(msgs)-1]
+func renderT1(scope string, msgs, source []Message, from, to time.Time) string {
+	last := source[len(source)-1]
+	carry := ""
+	recordLabel := "messages"
+	if len(carriedPriorSummaries(msgs)) > 0 {
+		carry = " Previous compacted summary carried forward."
+		recordLabel = "new messages"
+	}
 	return fmt.Sprintf(
-		"Prior %s context compacted: %d messages from %s to %s. Latest (%s): %s",
-		scope, len(msgs),
+		"Prior %s context compacted: %d %s from %s to %s.%s Latest (%s): %s",
+		scope, len(source), recordLabel,
 		from.UTC().Format("2006-01-02 15:04"),
 		to.UTC().Format("2006-01-02 15:04"),
+		carry,
 		speaker(last), truncate(collapse(last.Content), 240),
 	)
 }
@@ -250,13 +279,15 @@ func (m ModelCompactor) Compact(ctx context.Context, in Input) (Levels, error) {
 	}
 	msgs := normalize(in.Messages)
 	out := base
-	out.Generator = m.Client.ID()
 	anyOK := false
+	anyFallback := false
 	for _, lv := range AllLevels {
 		s, err := m.Client.Summarize(ctx, lv, msgs)
 		if err != nil || strings.TrimSpace(s) == "" {
+			anyFallback = true
 			continue // keep the deterministic level for this gradient
 		}
+		s = truncate(strings.TrimSpace(s), modelLevelBudget(lv))
 		anyOK = true
 		switch lv {
 		case LevelT1:
@@ -273,6 +304,10 @@ func (m ModelCompactor) Compact(ctx context.Context, in Input) (Levels, error) {
 		// Model produced nothing usable; record the honest generator so a
 		// later run knows this archive can be upgraded.
 		out.Generator = "deterministic"
+	} else if anyFallback {
+		out.Generator = "mixed:" + m.Client.ID() + "+deterministic"
+	} else {
+		out.Generator = m.Client.ID()
 	}
 	return out, nil
 }
@@ -284,6 +319,36 @@ func normalize(in []Message) []Message {
 	copy(out, in)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
 	return out
+}
+
+func sourceMessages(msgs []Message) []Message {
+	out := make([]Message, 0, len(msgs))
+	for _, m := range msgs {
+		if !isPriorSummary(m) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func carriedPriorSummaries(msgs []Message) []string {
+	out := make([]string, 0, 1)
+	for _, m := range msgs {
+		if !isPriorSummary(m) {
+			continue
+		}
+		content := strings.TrimSpace(m.Content)
+		content = strings.TrimSpace(strings.TrimPrefix(content, priorSummaryPrefix))
+		if content != "" {
+			out = append(out, content)
+		}
+	}
+	return out
+}
+
+func isPriorSummary(m Message) bool {
+	return strings.TrimSpace(m.Author) == "memory_archive" ||
+		strings.HasPrefix(strings.TrimSpace(m.Content), priorSummaryPrefix)
 }
 
 func window(msgs []Message) (time.Time, time.Time) {
@@ -316,6 +381,21 @@ func truncate(s string, max int) string {
 		return string(r[:max])
 	}
 	return string(r[:max-1]) + "…"
+}
+
+func modelLevelBudget(lv Level) int {
+	switch lv {
+	case LevelT1:
+		return modelT1MaxRunes
+	case LevelT2:
+		return modelT2MaxRunes
+	case LevelT3:
+		return modelT3MaxRunes
+	case LevelT4:
+		return modelT4MaxRunes
+	default:
+		return modelT2MaxRunes
+	}
 }
 
 func sortedKeys(m map[string]struct{}) []string {
