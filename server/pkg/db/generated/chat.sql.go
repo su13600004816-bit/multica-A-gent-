@@ -240,6 +240,36 @@ func (q *Queries) GetChatSessionInWorkspace(ctx context.Context, arg GetChatSess
 	return i, err
 }
 
+const getChatSessionWindowSize = `-- name: GetChatSessionWindowSize :one
+SELECT count(*)::bigint AS message_count,
+       COALESCE(sum(length(content)), 0)::bigint AS byte_size
+FROM chat_message
+WHERE chat_session_id = $1
+  AND ($2::timestamptz IS NULL OR created_at > $2)
+`
+
+type GetChatSessionWindowSizeParams struct {
+	ChatSessionID pgtype.UUID        `json:"chat_session_id"`
+	Since         pgtype.Timestamptz `json:"since"`
+}
+
+type GetChatSessionWindowSizeRow struct {
+	MessageCount int64 `json:"message_count"`
+	ByteSize     int64 `json:"byte_size"`
+}
+
+// Size of the ACTIVE window of a chat session for the PL-91 compaction
+// threshold: only messages newer than the last compaction point (narg
+// 'since' = chat_session.compacted_at) are counted, so a session that was
+// already compacted is measured from its fresh start, not from all time.
+// Pass a NULL 'since' to measure the whole session (never compacted).
+func (q *Queries) GetChatSessionWindowSize(ctx context.Context, arg GetChatSessionWindowSizeParams) (GetChatSessionWindowSizeRow, error) {
+	row := q.db.QueryRow(ctx, getChatSessionWindowSize, arg.ChatSessionID, arg.Since)
+	var i GetChatSessionWindowSizeRow
+	err := row.Scan(&i.MessageCount, &i.ByteSize)
+	return i, err
+}
+
 const getLastChatTaskSession = `-- name: GetLastChatTaskSession :one
 SELECT session_id, work_dir, runtime_id FROM agent_task_queue
 WHERE chat_session_id = $1

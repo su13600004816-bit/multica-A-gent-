@@ -83,6 +83,70 @@ func (m *MemoryArchiveService) ArchiveIssue(ctx context.Context, issueID, agentI
 	return m.runArchive(ctx, in, util.UUIDToString(issue.WorkspaceID), util.UUIDToString(agentID))
 }
 
+// Chat compaction thresholds (PL-91). A chat session's ACTIVE window
+// (messages since its last compaction) is compacted once it grows past
+// either bound. Tuned to cut long-running chat windows — the global 止血
+// target for cc / Claude开发 / cx / chat — before they balloon the resumed
+// provider context. Either trigger fires.
+const (
+	chatCompactMessageThreshold = 40
+	chatCompactByteThreshold    = 200_000
+)
+
+// ChatSessionNeedsCompaction reports whether an active-window size crosses a
+// compaction threshold. Pure so it is unit-testable without a DB.
+func ChatSessionNeedsCompaction(messageCount, byteSize int64) bool {
+	return messageCount >= chatCompactMessageThreshold || byteSize >= chatCompactByteThreshold
+}
+
+// MaybeCompactChatSession compacts a chat session when its active window has
+// grown past the threshold: it archives the window into T1..T4 and marks the
+// session compacted, which clears session_id/work_dir so the daemon's next
+// claim starts a fresh provider session. Returns true when it compacted.
+// Best-effort and fail-safe: the caller logs and continues, originals are
+// never deleted, and on any failure the session keeps its old resume pointer.
+func (m *MemoryArchiveService) MaybeCompactChatSession(ctx context.Context, session db.ChatSession) (bool, error) {
+	if m == nil {
+		return false, nil
+	}
+	size, err := m.Queries.GetChatSessionWindowSize(ctx, db.GetChatSessionWindowSizeParams{
+		ChatSessionID: session.ID,
+		Since:         session.CompactedAt,
+	})
+	if err != nil {
+		return false, fmt.Errorf("chat window size: %w", err)
+	}
+	if !ChatSessionNeedsCompaction(size.MessageCount, size.ByteSize) {
+		return false, nil
+	}
+	if err := m.ArchiveChatSession(ctx, session); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// ArchiveChatSession compacts a chat session's active window (messages newer
+// than its last compaction point) and marks it compacted.
+func (m *MemoryArchiveService) ArchiveChatSession(ctx context.Context, session db.ChatSession) error {
+	if m == nil || !session.ID.Valid {
+		return nil
+	}
+	msgs, err := m.Queries.ListChatMessages(ctx, session.ID)
+	if err != nil {
+		return fmt.Errorf("list chat messages: %w", err)
+	}
+	window := filterChatSince(msgs, session.CompactedAt)
+	if len(window) == 0 {
+		return nil
+	}
+	in := memorycompact.Input{
+		ScopeType: "chat_session",
+		ScopeID:   util.UUIDToString(session.ID),
+		Messages:  chatMessagesToMessages(window),
+	}
+	return m.runArchive(ctx, in, util.UUIDToString(session.WorkspaceID), util.UUIDToString(session.AgentID))
+}
+
 // IssueMemorySummary returns the low-gradient (T1 + T2) summary to inject
 // into a fresh session's prompt, or "" when the issue has no archive. Always
 // best-effort: any error yields "".
@@ -152,6 +216,36 @@ func commentsToMessages(comments []db.Comment) []memorycompact.Message {
 			Content:   c.Content,
 			CreatedAt: c.CreatedAt.Time,
 		})
+	}
+	return out
+}
+
+// chatMessagesToMessages normalises chat messages into compactor input.
+func chatMessagesToMessages(rows []db.ChatMessage) []memorycompact.Message {
+	out := make([]memorycompact.Message, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, memorycompact.Message{
+			Author:    r.Role,
+			Role:      r.Role,
+			Content:   r.Content,
+			CreatedAt: r.CreatedAt.Time,
+		})
+	}
+	return out
+}
+
+// filterChatSince returns only the messages created strictly after `since`
+// (the last compaction point). A NULL `since` means never compacted, so all
+// messages are returned. Builds a new slice — never mutates the input.
+func filterChatSince(rows []db.ChatMessage, since pgtype.Timestamptz) []db.ChatMessage {
+	if !since.Valid {
+		return rows
+	}
+	out := make([]db.ChatMessage, 0, len(rows))
+	for _, r := range rows {
+		if r.CreatedAt.Valid && r.CreatedAt.Time.After(since.Time) {
+			out = append(out, r)
+		}
 	}
 	return out
 }

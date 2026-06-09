@@ -47,6 +47,59 @@ func TestNewMemoryArchiveService_NilCompactorDefaults(t *testing.T) {
 	}
 }
 
+func TestChatSessionNeedsCompaction(t *testing.T) {
+	cases := []struct {
+		name           string
+		count, byteLen int64
+		want           bool
+	}{
+		{"small", 5, 1000, false},
+		{"just-under-count", chatCompactMessageThreshold - 1, 1000, false},
+		{"at-count", chatCompactMessageThreshold, 1000, true},
+		{"at-bytes", 3, chatCompactByteThreshold, true},
+		{"over-bytes-under-count", 2, chatCompactByteThreshold + 50, true},
+	}
+	for _, c := range cases {
+		if got := ChatSessionNeedsCompaction(c.count, c.byteLen); got != c.want {
+			t.Errorf("%s: ChatSessionNeedsCompaction(%d,%d) = %v, want %v", c.name, c.count, c.byteLen, got, c.want)
+		}
+	}
+}
+
+func TestChatMessagesToMessages(t *testing.T) {
+	when := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	rows := []db.ChatMessage{
+		{Role: "user", Content: "hi", CreatedAt: pgtype.Timestamptz{Time: when, Valid: true}},
+		{Role: "assistant", Content: "hello", CreatedAt: pgtype.Timestamptz{Time: when.Add(time.Minute), Valid: true}},
+	}
+	msgs := chatMessagesToMessages(rows)
+	if len(msgs) != 2 || msgs[0].Role != "user" || msgs[1].Content != "hello" {
+		t.Fatalf("unexpected conversion: %+v", msgs)
+	}
+}
+
+func TestFilterChatSince(t *testing.T) {
+	t0 := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	rows := []db.ChatMessage{
+		{Content: "old", CreatedAt: pgtype.Timestamptz{Time: t0, Valid: true}},
+		{Content: "boundary", CreatedAt: pgtype.Timestamptz{Time: t0.Add(time.Minute), Valid: true}},
+		{Content: "new", CreatedAt: pgtype.Timestamptz{Time: t0.Add(2 * time.Minute), Valid: true}},
+	}
+	// NULL since => everything (never compacted).
+	if got := filterChatSince(rows, pgtype.Timestamptz{}); len(got) != 3 {
+		t.Errorf("NULL since should return all, got %d", len(got))
+	}
+	// since = boundary => only strictly-after ("new").
+	got := filterChatSince(rows, pgtype.Timestamptz{Time: t0.Add(time.Minute), Valid: true})
+	if len(got) != 1 || got[0].Content != "new" {
+		t.Errorf("since boundary should return only newer messages, got %+v", got)
+	}
+	// Input must not be mutated.
+	if rows[0].Content != "old" {
+		t.Errorf("filterChatSince mutated its input")
+	}
+}
+
 // TestArchiveIssue_NilReceiverAndInvalidID is a guard: the best-effort entry
 // points must no-op (not panic) on the nil/invalid paths CompleteTask relies
 // on for fail-safety.

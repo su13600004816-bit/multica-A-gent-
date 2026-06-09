@@ -83,6 +83,18 @@ SELECT * FROM chat_message
 WHERE chat_session_id = $1
 ORDER BY created_at ASC;
 
+-- name: GetChatSessionWindowSize :one
+-- Size of the ACTIVE window of a chat session for the PL-91 compaction
+-- threshold: only messages newer than the last compaction point (narg
+-- 'since' = chat_session.compacted_at) are counted, so a session that was
+-- already compacted is measured from its fresh start, not from all time.
+-- Pass a NULL 'since' to measure the whole session (never compacted).
+SELECT count(*)::bigint AS message_count,
+       COALESCE(sum(length(content)), 0)::bigint AS byte_size
+FROM chat_message
+WHERE chat_session_id = $1
+  AND (sqlc.narg('since')::timestamptz IS NULL OR created_at > sqlc.narg('since'));
+
 -- name: GetChatMessage :one
 SELECT * FROM chat_message
 WHERE id = $1;

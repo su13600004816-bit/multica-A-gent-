@@ -1374,32 +1374,35 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 					resp.Repos = repos
 				}
 			}
-			// Compacted chat sessions (PL-91) had their session_id/work_dir
-			// cleared and compacted_at stamped; the operator kill switch can
-			// also force fresh. In either case do not resume — the fresh
-			// session carries only the injected summary.
-			if !task.ForceFreshSession && !cs.CompactedAt.Valid &&
+			if !task.ForceFreshSession &&
 				!h.sessionResumeBlocked(r.Context(), task.AgentID, pgtype.UUID{}) {
 				// Resume chat sessions only when the stored pointer was produced
-				// by the same runtime as the claiming task. When the chat_session
-				// pointer is missing (legacy NULL runtime_id), stale (last task
-				// failed before reporting completion), or runtime-mismatched, fall
-				// back to the most recent task row that recorded a session_id —
-				// otherwise a single failed turn would silently drop the entire
-				// conversation memory on the next message. The fallback also
-				// requires runtime to match.
+				// by the same runtime as the claiming task. PL-91: when a session
+				// was compacted, MarkChatSessionCompacted cleared its
+				// session_id/work_dir, so this primary resume naturally yields
+				// nothing on the first post-compaction claim — the fresh session
+				// carries only the injected summary. Once a fresh session
+				// completes, CompleteTask repopulates cs.SessionID and continuity
+				// resumes from there.
 				if cs.SessionID.Valid && cs.RuntimeID.Valid && cs.RuntimeID == task.RuntimeID {
 					resp.PriorSessionID = cs.SessionID.String
 				}
 				if cs.WorkDir.Valid {
 					resp.PriorWorkDir = cs.WorkDir.String
 				}
-				if prior, err := h.Queries.GetLastChatTaskSession(r.Context(), cs.ID); err == nil && prior.SessionID.Valid {
-					if resp.PriorSessionID == "" && prior.RuntimeID == task.RuntimeID {
-						resp.PriorSessionID = prior.SessionID.String
-					}
-					if prior.WorkDir.Valid && resp.PriorWorkDir == "" {
-						resp.PriorWorkDir = prior.WorkDir.String
+				// The cross-task fallback recovers a session_id from a prior task
+				// row when the chat_session pointer is missing. For a COMPACTED
+				// session we must NOT take it: it could reach a pre-compaction
+				// task and silently undo the 止血. Skip it while compacted; the
+				// primary pointer above is the only resume path post-compaction.
+				if !cs.CompactedAt.Valid {
+					if prior, err := h.Queries.GetLastChatTaskSession(r.Context(), cs.ID); err == nil && prior.SessionID.Valid {
+						if resp.PriorSessionID == "" && prior.RuntimeID == task.RuntimeID {
+							resp.PriorSessionID = prior.SessionID.String
+						}
+						if prior.WorkDir.Valid && resp.PriorWorkDir == "" {
+							resp.PriorWorkDir = prior.WorkDir.String
+						}
 					}
 				}
 			}

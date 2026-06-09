@@ -74,36 +74,44 @@ comment 原文，只新增摘要 + 翻转可空标记列。**
 
 ## 仍待接线（下一批）
 
-1. **C. chat 超阈值止血** — `handler/chat.go` `SendChatMessage` 入口：按
-   `bytes/comment_count/token_estimate` 判阈值，超阈值对旧 `chat_session` 调
-   `MemoryArchiveService.ArchiveChatSession`（内部 `MarkChatSessionCompacted`
-   清空 session_id/work_dir 并盖 compacted_at）。claim gate 已就绪，缺触发。
+## C/E 已落地（第二批接线，已 build+test 通过）
+- **C. chat 超阈值止血** — `handler/chat.go` `SendChatMessage`：在创建新用户消息
+  **之前**调 `MaybeCompactChatSession`。`GetChatSessionWindowSize` 只数“上次压缩后”
+  的活动窗口（`since=chat_session.compacted_at`），超 `40 条 / 200KB` 阈值即
+  `ArchiveChatSession` → `MarkChatSessionCompacted`（清空 session_id/work_dir + 盖
+  compacted_at）。新消息开启全新窗口。
+- **daemon chat gate（续）** — 不再硬挡整段；compacted 后 `cs.SessionID` 已为空 →
+  主续接自然落空；**仅跳过跨任务 fallback**（避免摸到压缩点之前的旧 session）。
+  fresh 会话完成后 `CompleteTask` 回填 `cs.SessionID`，连续性自动恢复。
+- **E. retry 连续失败 fresh** — `CreateRetryTask`：父任务本身已是 retry
+  (`parent_task_id IS NOT NULL`) 或 `codex_semantic_inactivity` 时，子任务
+  NULL 化 session/work_dir 且 `force_fresh_session=true`。
+- **D. squad 自触发** — 归档**不发任何评论**（纯 DB 行），无 leader/agent 唤醒，
+  天然无自触发循环。
+- **7. DeepSeek/Qwen** — `DefaultCompactor` 优先 Qwen(记忆总管)，无则 DeepSeek，
+  再无则 deterministic；任一级模型失败逐级回落，**不丢原文、不中断主流程**。
 
-2. **D. 小队 leader 自触发循环** — 当前归档**不发任何评论**（纯 DB 行），无自触发风险；
-   若将来要发归档播报评论，用 `author_type='system'` 且不带 `mention://agent|squad`。
-
-3. **E. retry 连续失败 fresh** — 已有 `CreateRetryTask` 对
-   `codex_semantic_inactivity` 置 `force_fresh_session`；扩展为连续 N 次失败也置位。
-
-## 构建 / 测试（已在 go1.26.1 + sqlc v1.31.1 下跑通）
+## 构建 / 测试（go1.26.1 + sqlc v1.31.1，全部跑通）
 
 ```
 cd server
-sqlc generate                 # 由 memory_archive.sql 生成 Go（已提交生成结果）
-go build ./internal/handler/ ./pkg/db/generated/   # ✓ 编译通过
-go test ./internal/service/memorycompact/...        # ✓ 15/15 PASS
+sqlc generate                                   # 已提交生成结果
+go build ./...                                  # ✓ 全量编译通过
+go test ./internal/service/memorycompact/       # ✓ 17/17
+go test ./internal/service/ ./internal/handler/ ./internal/daemon/  # ✓ 全过，无回归
 # 迁移：migrate up 跑到 112；回滚 down 到 111 应干净
 ```
-
-> 全量 `go build ./...` 受本机磁盘 100% 限制未跑完（仅余 ~130M），但所有
-> 受影响的包（handler / generated db / memorycompact）均已单独编译 + vet + 测试通过。
 
 ## 验收映射
 
 | 验收项 | 覆盖 |
 |--------|------|
-| chat 超阈值后下次 claim 无 PriorSessionID | gate 已落地；阈值触发见待接线 #3 |
-| issue complete 后归档 + prompt 不要全量 | 归档服务/gate 已落地；hook+prompt 见 #2/#4 |
-| squad leader 不被 archive 评论自触发 | 见 #5（system 作者 + 无 mention） |
-| retry 连续失败 fresh session | 见 #6 |
-| 原文不删除可溯源 | memory_archive 仅新增；T4→T1 可下探（已落地） |
+| chat 超阈值后下次 claim 无 PriorSessionID | `MaybeCompactChatSession` 清 session_id + gate 跳 fallback ✓ |
+| issue complete 后归档 + prompt 不要全量 | `CompleteTask` hook + `MemorySummary` 注入 + prompt 收敛 ✓ |
+| squad leader 不被 archive 评论自触发 | 归档不发任何评论 ✓ |
+| retry 连续失败 fresh session | `CreateRetryTask` parent_task_id 谓词 ✓ |
+| 原文不删除可溯源 | memory_archive 仅新增；T4→T1 可下探 ✓ |
+
+> 说明：上表“行为级”验收的端到端断言需带 Postgres 的 CI 集成测试覆盖；本仓库
+> 单测覆盖决策/转换逻辑（阈值、窗口过滤、prompt 注入、模型选择/回落、Archiver
+> fail-safe），其余由 `go build ./...` 全绿 + 各包套件无回归保证编译期正确。

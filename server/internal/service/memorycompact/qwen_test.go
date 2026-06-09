@@ -100,3 +100,29 @@ func TestDefaultCompactor_WithKeyUsesModel(t *testing.T) {
 		t.Errorf("model = %q, want qwen-max", mc.Client.ID())
 	}
 }
+
+func TestDefaultCompactor_DeepSeekFallback(t *testing.T) {
+	// No Qwen key, but DeepSeek configured => DeepSeek client is selected.
+	t.Setenv("DASHSCOPE_API_KEY", "")
+	t.Setenv("DEEPSEEK_API_KEY", "sk-ds")
+	t.Setenv("DEEPSEEK_MODEL", "deepseek-chat")
+	c := DefaultCompactor()
+	mc, ok := c.(ModelCompactor)
+	if !ok {
+		t.Fatalf("with DeepSeek key DefaultCompactor must be ModelCompactor, got %T", c)
+	}
+	if mc.Client.ID() != "deepseek-chat" {
+		t.Errorf("model = %q, want deepseek-chat", mc.Client.ID())
+	}
+}
+
+func TestDefaultCompactor_QwenPreferredOverDeepSeek(t *testing.T) {
+	t.Setenv("DASHSCOPE_API_KEY", "sk-q")
+	t.Setenv("QWEN_MODEL", "qwen-plus")
+	t.Setenv("DEEPSEEK_API_KEY", "sk-ds")
+	c := DefaultCompactor()
+	mc := c.(ModelCompactor)
+	if mc.Client.ID() != "qwen-plus" {
+		t.Errorf("Qwen must win when both set, got %q", mc.Client.ID())
+	}
+}
