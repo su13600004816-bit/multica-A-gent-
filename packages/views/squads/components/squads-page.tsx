@@ -131,9 +131,16 @@ export function SquadsPage() {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-4">
+                {/* Two-column paired layout (PL-111): each squad card sits next to
+                    its own canvas card. The canvas card opens the squad's
+                    orchestration page (/<ws>/canvas/<squadId>); the squad card
+                    keeps opening the squad detail page. Stacks on narrow screens. */}
                 <div className="grid gap-3">
                   {filtered.map((squad) => (
-                    <SquadCard key={squad.id} squad={squad} leader={agentsById.get(squad.leader_id)} creator={membersByUserId.get(squad.creator_id)} href={p.squadDetail(squad.id)} />
+                    <div key={squad.id} className="grid gap-3 lg:grid-cols-2">
+                      <SquadCard squad={squad} leader={agentsById.get(squad.leader_id)} creator={membersByUserId.get(squad.creator_id)} href={p.squadDetail(squad.id)} />
+                      <CanvasCard squad={squad} href={p.squadCanvas(squad.id)} />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -283,6 +290,28 @@ function SquadCard({ squad, leader, creator, href }: { squad: Squad; leader?: Ag
   );
 }
 
+// Canvas card — the right half of each paired row (PL-111). Visually a sibling
+// of SquadCard (same rounded-lg border / hover-accent chrome), but it carries
+// the squad's avatar + "<name> 画布" and opens the squad's orchestration page.
+function CanvasCard({ squad, href }: { squad: Squad; href: string }) {
+  const { t } = useT("squads");
+  return (
+    <AppLink
+      href={href}
+      className="group flex items-center gap-3 sm:gap-4 rounded-lg border p-3 sm:p-4 hover:bg-accent/50 transition-colors w-full overflow-hidden"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Network className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <p className="font-medium truncate">{t(($) => $.canvas_page.card_title, { name: squad.name })}</p>
+        <p className="text-sm text-muted-foreground truncate mt-0.5">{t(($) => $.canvas_page.card_hint)}</p>
+      </div>
+      <Network className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
+    </AppLink>
+  );
+}
+
 function ScopeSegment({ scope, setScope, counts }: { scope: Scope; setScope: (v: Scope) => void; counts: { all: number; mine: number } }) {
   return (
     <div className="flex items-center gap-0.5 rounded-md bg-muted p-0.5">
@@ -319,12 +348,16 @@ function SquadsListSkeleton() {
       <div className="flex-1 overflow-y-auto p-4">
         <div className="grid gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 sm:gap-4 rounded-lg border p-3 sm:p-4">
-              <Skeleton className="h-9 w-9 shrink-0 rounded-md" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-1/3 rounded" />
-                <Skeleton className="h-3 w-2/3 rounded" />
-              </div>
+            <div key={i} className="grid gap-3 lg:grid-cols-2">
+              {Array.from({ length: 2 }).map((_, j) => (
+                <div key={j} className="flex items-center gap-3 sm:gap-4 rounded-lg border p-3 sm:p-4">
+                  <Skeleton className="h-9 w-9 shrink-0 rounded-md" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-1/3 rounded" />
+                    <Skeleton className="h-3 w-2/3 rounded" />
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>

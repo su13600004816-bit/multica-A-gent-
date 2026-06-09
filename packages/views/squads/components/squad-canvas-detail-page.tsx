@@ -12,19 +12,20 @@ import { Users } from "lucide-react";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { ActorAvatar as ActorAvatarBase } from "@multica/ui/components/common/actor-avatar";
 import { ActorAvatar } from "../../common/actor-avatar";
-import { useNavigation } from "../../navigation";
+import { AppLink, useNavigation } from "../../navigation";
 import { BreadcrumbHeader } from "../../layout/breadcrumb-header";
 import { useT, useTimeAgo } from "../../i18n";
 import { SquadCanvasBoard } from "./squad-canvas-board";
+import { SquadTaskBoard } from "./squad-task-board";
 
-// Independent canvas detail page (finalized PL-89 spec). A canvas is a
-// first-class entity, peer to a squad: each squad owns one canvas, reachable
-// at /<ws>/canvas/<squadId>. The page deliberately mirrors the squad DETAIL
-// page — breadcrumb + left read-only inspector (Leader / Members / Created /
-// Updated) + right main panel — so it reads as the same Multica surface. The
-// ONLY structural difference vs squad detail: the main panel is one full-bleed
-// ReactFlow board instead of the Members/Instructions tabs. No backend canvas
-// store yet, so the board is rendered from the squad + its members.
+// Canvas orchestration page (PL-111 v2). A canvas is a first-class entity, peer
+// to a squad: each squad owns one canvas, reachable at /<ws>/canvas/<squadId>.
+// The page mirrors the squad DETAIL surface — breadcrumb + left detail bar +
+// right main panel — so it reads as native Multica chrome. The left bar is split
+// into two stacked blocks (上块 小队成员区 / 下块 小线任务看板); the right main
+// panel is one full-bleed, manually-editable ReactFlow board with a bottom
+// 画布编排工具栏. No backend canvas store yet, so the board seeds from the squad +
+// its members and edits live in-session.
 
 function InspectorRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -106,6 +107,11 @@ export function SquadCanvasDetailPage() {
     return wsMembers.find((m) => m.user_id === id)?.name ?? id.slice(0, 8);
   };
 
+  const memberRole = (type: string, id: string) => {
+    if (type === "member") return wsMembers.find((m) => m.user_id === id)?.role ?? null;
+    return null;
+  };
+
   if (!squad) {
     return <CanvasDetailSkeleton />;
   }
@@ -116,77 +122,123 @@ export function SquadCanvasDetailPage() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-  const boardTitle = t(($) => $.canvas_tab.board_title, { name: squad.name });
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
       <BreadcrumbHeader
-        segments={[
-          { href: p.squads(), label: t(($) => $.page.title) },
-          { href: p.squadDetail(squad.id), label: squad.name },
-        ]}
+        segments={[{ href: p.squads(), label: t(($) => $.canvas_page.breadcrumb_root) }]}
         leaf={
           <>
             <CanvasHeaderAvatar squad={squad} initials={initials} />
-            <h1 className="truncate text-sm font-medium text-foreground">{boardTitle}</h1>
+            <h1 className="truncate text-sm font-medium text-foreground">
+              {t(($) => $.canvas_page.breadcrumb_leaf)}
+            </h1>
           </>
         }
       />
 
-      {/* Two-column grid mirrors squad-detail-page: left read-only inspector,
-          right main panel. Here the main panel is one full-bleed canvas box. */}
+      {/* Two-column grid mirrors squad-detail-page: left detail bar, right main
+          panel. The main panel is one full-bleed, editable canvas box. */}
       <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-y-auto p-3 md:grid md:grid-cols-[280px_minmax(0,1fr)] md:gap-4 md:overflow-hidden md:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="flex w-full flex-col rounded-lg border bg-background md:h-full md:min-h-0 md:overflow-y-auto">
-          {/* Identity */}
-          <div className="flex flex-col gap-3 border-b px-5 pb-5 pt-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-              {squad.avatar_url ? (
-                <ActorAvatarBase
-                  name={squad.name}
-                  initials={initials}
-                  avatarUrl={resolvePublicFileUrl(squad.avatar_url)}
-                  isSquad
-                  size={64}
-                  className="rounded-none"
-                />
-              ) : (
-                <Users className="h-7 w-7 text-muted-foreground" />
-              )}
+        <aside className="flex w-full flex-col rounded-lg border bg-background md:h-full md:min-h-0 md:overflow-hidden">
+          {/* 上块 — 小队成员区 (identity + details + member list) */}
+          <div className="flex min-h-0 flex-col md:flex-[3] md:overflow-y-auto">
+            {/* Identity */}
+            <div className="flex flex-col gap-3 border-b px-5 pb-5 pt-5">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+                {squad.avatar_url ? (
+                  <ActorAvatarBase
+                    name={squad.name}
+                    initials={initials}
+                    avatarUrl={resolvePublicFileUrl(squad.avatar_url)}
+                    isSquad
+                    size={64}
+                    className="rounded-none"
+                  />
+                ) : (
+                  <Users className="h-7 w-7 text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <p className="truncate text-sm font-semibold">{squad.name}</p>
+                {squad.description && (
+                  <p className="line-clamp-3 text-xs text-muted-foreground">{squad.description}</p>
+                )}
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <p className="truncate text-sm font-semibold">{boardTitle}</p>
-              {squad.description && (
-                <p className="line-clamp-3 text-xs text-muted-foreground">{squad.description}</p>
-              )}
+
+            {/* Details — read-only, same rows as the squad inspector */}
+            <div className="border-b px-5 py-4">
+              <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                {t(($) => $.inspector.details_section)}
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+                <InspectorRow label="Leader">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <ActorAvatar actorType="agent" actorId={squad.leader_id} size={14} />
+                    <span className="truncate">{getEntityName("agent", squad.leader_id)}</span>
+                  </span>
+                </InspectorRow>
+                <InspectorRow label="Members">
+                  <span className="text-muted-foreground tabular-nums">{members.length}</span>
+                </InspectorRow>
+                <InspectorRow label="Created">
+                  <span className="text-muted-foreground">{timeAgo(squad.created_at)}</span>
+                </InspectorRow>
+                <InspectorRow label="Updated">
+                  <span className="text-muted-foreground">{timeAgo(squad.updated_at)}</span>
+                </InspectorRow>
+              </div>
+            </div>
+
+            {/* Member list — same rows as the squad detail / profile card */}
+            <div className="px-3 py-3">
+              <div className="mb-1 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                {t(($) => $.members_tab.section_title)}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {members.map((m) => {
+                  const isLeader = m.member_type === "agent" && m.member_id === squad.leader_id;
+                  const name = getEntityName(m.member_type, m.member_id);
+                  const role = memberRole(m.member_type, m.member_id);
+                  const href =
+                    m.member_type === "agent" ? p.agentDetail(m.member_id) : p.memberDetail(m.member_id);
+                  return (
+                    <AppLink
+                      key={`${m.member_type}-${m.member_id}`}
+                      href={href}
+                      className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-accent/60"
+                    >
+                      <ActorAvatar
+                        actorType={m.member_type}
+                        actorId={m.member_id}
+                        size={20}
+                        showStatusDot={m.member_type === "agent"}
+                        className="shrink-0"
+                      />
+                      <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
+                      {isLeader && (
+                        <span className="max-w-[4rem] shrink-0 truncate rounded-md bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          {t(($) => $.members_tab.leader_chip)}
+                        </span>
+                      )}
+                      {role && (
+                        <span className="max-w-[3.5rem] shrink-0 truncate text-muted-foreground">{role}</span>
+                      )}
+                    </AppLink>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* Details — read-only, same rows as the squad inspector */}
-          <div className="border-b px-5 py-4">
-            <div className="mb-1 -mx-2 px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              {t(($) => $.inspector.details_section)}
-            </div>
-            <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
-              <InspectorRow label="Leader">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <ActorAvatar actorType="agent" actorId={squad.leader_id} size={14} />
-                  <span className="truncate">{getEntityName("agent", squad.leader_id)}</span>
-                </span>
-              </InspectorRow>
-              <InspectorRow label="Members">
-                <span className="text-muted-foreground tabular-nums">{members.length}</span>
-              </InspectorRow>
-              <InspectorRow label="Created">
-                <span className="text-muted-foreground">{timeAgo(squad.created_at)}</span>
-              </InspectorRow>
-              <InspectorRow label="Updated">
-                <span className="text-muted-foreground">{timeAgo(squad.updated_at)}</span>
-              </InspectorRow>
-            </div>
+          {/* 下块 — 小线任务看板 (issues board data for this squad / its members) */}
+          <div className="flex min-h-0 flex-col border-t md:flex-[2] md:overflow-hidden">
+            <SquadTaskBoard squadId={squad.id} memberIds={members.map((m) => m.member_id)} />
           </div>
         </aside>
 
-        {/* Main — one big canvas box (the "1 个大框" from the spec). */}
+        {/* Main — one big editable canvas box with bottom toolbar. */}
         <div className="flex min-h-[60vh] flex-col overflow-hidden rounded-lg border bg-background md:h-full md:min-h-0">
           <div className="h-full p-3 md:p-4">
             <SquadCanvasBoard

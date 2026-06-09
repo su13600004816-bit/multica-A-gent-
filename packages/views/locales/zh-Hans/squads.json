@@ -17,6 +17,28 @@
     "board_title": "{{name}} 画布",
     "root_subtitle_other": "{{count}} 名成员"
   },
+  "canvas_page": {
+    "card_title": "{{name}} 画布",
+    "card_hint": "点击进入画布编排页面",
+    "breadcrumb_root": "画布",
+    "breadcrumb_leaf": "画布编排",
+    "members_section": "小队成员",
+    "board_section": "小线任务看板",
+    "board_empty": "该小队暂无关联任务",
+    "new_node_label": "新节点",
+    "toolbar_add_node": "添加节点",
+    "toolbar_delete": "删除选中",
+    "toolbar_fit": "适应视图",
+    "toolbar_reset": "重置布局",
+    "toolbar_hint": "拖拽移动 · 连线 · 双击重命名",
+    "status_backlog": "待办池",
+    "status_todo": "待办",
+    "status_in_progress": "进行中",
+    "status_in_review": "评审中",
+    "status_done": "完成",
+    "status_blocked": "已阻塞",
+    "status_cancelled": "已取消"
+  },
   "inspector": {
     "details_section": "详情",
     "archive_button": "归档"
