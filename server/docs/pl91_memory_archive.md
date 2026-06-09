@@ -102,6 +102,20 @@ go test ./internal/service/ ./internal/handler/ ./internal/daemon/  # ✓ 全过
 # 迁移：migrate up 跑到 112；回滚 down 到 111 应干净
 ```
 
+## 审计 FAIL 返工（03:50 Codex-T02 VERDICT: FAIL → 已补齐）
+1. **runtime config 条件化历史** — `execenv` 的 assignment brief（`runtime_config.go` 第3步）
+   原写死全量 `comment list ... --output json` mandatory。现 `TaskContextForEnv` 增
+   `MemorySummary`，daemon `InjectRuntimeConfig` 注入；非空时第3步改为注入 T1/T2 摘要 +
+   “不要默认读全量、必要时逐级下探”，移除 mandatory 全量指令。
+2. **chat fresh 摘要注入** — daemon claim 对 compacted chat session 取
+   `ChatSessionMemorySummary`(scope=chat_session) 注入 `resp.MemorySummary`；
+   `buildChatPrompt` 顶部注入 T1/T2 摘要 + archive 说明，不再只发最新 user message。
+3. **task 级归档** — `CompleteTask` 除 `ArchiveIssue` 外，新增 `ArchiveTask` 写
+   `scope_type='task'` 记录（trigger 上下文 + 最终输出），fail-safe、不删原文，可经
+   archive 索引溯源单次 run。
+- 测试：`runtime_config_test`（compacted 无 mandatory 全量 / 未 compacted 保留）、
+  `prompt_test`（chat 注入摘要）、`memory_archive_test`（extractTaskOutput / taskResultToMessages）。
+
 ## 验收映射
 
 | 验收项 | 覆盖 |

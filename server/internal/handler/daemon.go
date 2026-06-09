@@ -1406,6 +1406,16 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
+			// PL-91: after a chat session is compacted, the fresh provider
+			// session must still carry the low-gradient summary or the
+			// conversation context is lost. Inject the chat scope's T1/T2
+			// summary so buildChatPrompt can prepend it. Best-effort; empty
+			// until the session has actually been compacted/archived.
+			if cs.CompactedAt.Valid && h.TaskService != nil && h.TaskService.Memory != nil {
+				if summary := h.TaskService.Memory.ChatSessionMemorySummary(r.Context(), cs.ID); summary != "" {
+					resp.MemorySummary = summary
+				}
+			}
 			// Load the latest user message for the chat prompt, plus any
 			// attachments linked to that exact message. Without the structured
 			// attachment list the agent only sees the markdown URL in

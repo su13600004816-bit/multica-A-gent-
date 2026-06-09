@@ -1,13 +1,51 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/protocol"
 )
+
+func TestExtractTaskOutput(t *testing.T) {
+	result, _ := json.Marshal(protocol.TaskCompletedPayload{Output: "fixed the login bug"})
+	if got := extractTaskOutput(result); got != "fixed the login bug" {
+		t.Errorf("extractTaskOutput = %q, want 'fixed the login bug'", got)
+	}
+	if got := extractTaskOutput([]byte("not json")); got != "" {
+		t.Errorf("extractTaskOutput on bad JSON should be empty, got %q", got)
+	}
+}
+
+func TestTaskResultToMessages(t *testing.T) {
+	t0 := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	result, _ := json.Marshal(protocol.TaskCompletedPayload{Output: "done: shipped"})
+	task := db.AgentTaskQueue{
+		TriggerSummary: pgtype.Text{String: "investigate login redirect", Valid: true},
+		CreatedAt:      pgtype.Timestamptz{Time: t0, Valid: true},
+		CompletedAt:    pgtype.Timestamptz{Time: t0.Add(time.Minute), Valid: true},
+	}
+	msgs := taskResultToMessages(task, result)
+	if len(msgs) != 2 {
+		t.Fatalf("expected trigger + output = 2 messages, got %d", len(msgs))
+	}
+	if msgs[0].Content != "investigate login redirect" || msgs[0].Role != "user" {
+		t.Errorf("msg[0] (trigger) = %+v", msgs[0])
+	}
+	if msgs[1].Content != "done: shipped" || msgs[1].Role != "assistant" {
+		t.Errorf("msg[1] (output) = %+v", msgs[1])
+	}
+
+	// No trigger summary, no output => no archive (nothing to record).
+	empty := taskResultToMessages(db.AgentTaskQueue{}, []byte("not json"))
+	if len(empty) != 0 {
+		t.Errorf("empty task should yield no messages, got %d", len(empty))
+	}
+}
 
 func TestCommentsToMessages(t *testing.T) {
 	when := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)

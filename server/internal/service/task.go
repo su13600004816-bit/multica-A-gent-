@@ -1155,6 +1155,21 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, resu
 		}
 	}
 
+	// Task-level archive (PL-91): record a scope_type='task' archive of this
+	// run (trigger context + final output) so the run itself is traceable
+	// through the archive index, independent of the issue/chat scope. Covers
+	// both issue and chat tasks. Best-effort, post-commit, never deletes
+	// originals.
+	if s.Memory != nil {
+		if err := s.Memory.ArchiveTask(ctx, task, result); err != nil {
+			slog.Warn("task memory archive failed (non-fatal)",
+				"task_id", util.UUIDToString(task.ID),
+				"agent_id", util.UUIDToString(task.AgentID),
+				"error", err,
+			)
+		}
+	}
+
 	// Quick-create tasks: locate the issue the agent just created and push
 	// an inbox confirmation to the requester. The agent has no issue / chat
 	// link, so the regular completion paths above don't apply. We find the
