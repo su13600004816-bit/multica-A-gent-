@@ -169,7 +169,10 @@ WHERE id = $1 AND issue_id IS NULL;
 -- agent's resume context (session_id/work_dir) so the child can continue
 -- the conversation when the backend supports it. Resume-unsafe failures are
 -- retried as fresh sessions so the child does not inherit a stuck agent
--- conversation. Keep the CASE WHEN predicates in sync with
+-- conversation. PL-91: a retry whose parent was ITSELF a retry
+-- (parent_task_id IS NOT NULL) is a consecutive failure / semantic spin, so
+-- it too starts fresh — we stop re-feeding a provider session that has
+-- already failed more than once. Keep the CASE WHEN predicates in sync with
 -- resumeUnsafeFailureReason and the resume lookup blacklists. attempt is
 -- incremented; max_attempts, trigger_comment_id, and is_leader_task are
 -- inherited so the retried task keeps the same squad-role provenance as its
@@ -184,10 +187,10 @@ INSERT INTO agent_task_queue (
 SELECT
     p.agent_id, p.runtime_id, p.issue_id, p.chat_session_id, p.autopilot_run_id,
     'queued', p.priority, p.trigger_comment_id, p.trigger_summary, p.context,
-    CASE WHEN p.failure_reason IS NOT DISTINCT FROM 'codex_semantic_inactivity' THEN NULL ELSE p.session_id END,
-    CASE WHEN p.failure_reason IS NOT DISTINCT FROM 'codex_semantic_inactivity' THEN NULL ELSE p.work_dir END,
+    CASE WHEN p.failure_reason IS NOT DISTINCT FROM 'codex_semantic_inactivity' OR p.parent_task_id IS NOT NULL THEN NULL ELSE p.session_id END,
+    CASE WHEN p.failure_reason IS NOT DISTINCT FROM 'codex_semantic_inactivity' OR p.parent_task_id IS NOT NULL THEN NULL ELSE p.work_dir END,
     p.attempt + 1, p.max_attempts, p.id,
-    p.failure_reason IS NOT DISTINCT FROM 'codex_semantic_inactivity',
+    p.failure_reason IS NOT DISTINCT FROM 'codex_semantic_inactivity' OR p.parent_task_id IS NOT NULL,
     p.is_leader_task
 FROM agent_task_queue p
 WHERE p.id = $1

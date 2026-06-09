@@ -25,11 +25,14 @@ type QwenClient struct {
 	HTTP      *http.Client
 }
 
-// DashScope OpenAI-compatible defaults, matching line_bridge.py.
+// DashScope / DeepSeek OpenAI-compatible defaults, matching line_bridge.py.
 const (
 	defaultDashScopeBaseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 	defaultQwenModel        = "qwen-plus"
 	defaultQwenMaxTokens    = 1500
+
+	defaultDeepSeekBaseURL = "https://api.deepseek.com/v1"
+	defaultDeepSeekModel   = "deepseek-chat"
 )
 
 // NewQwenClientFromEnv builds a QwenClient from DASHSCOPE_API_KEY /
@@ -49,6 +52,33 @@ func NewQwenClientFromEnv() *QwenClient {
 	model := strings.TrimSpace(os.Getenv("QWEN_MODEL"))
 	if model == "" {
 		model = defaultQwenModel
+	}
+	return &QwenClient{
+		BaseURL:   base,
+		APIKey:    key,
+		Model:     model,
+		MaxTokens: defaultQwenMaxTokens,
+		HTTP:      &http.Client{Timeout: 90 * time.Second},
+	}
+}
+
+// NewDeepSeekClientFromEnv builds an OpenAI-compatible client pointed at
+// DeepSeek (DEEPSEEK_API_KEY / DEEPSEEK_BASE_URL / DEEPSEEK_MODEL), reusing
+// the same request/parse path as Qwen. Returns nil when no key is set, so it
+// composes as a fallback. The QwenClient type is provider-agnostic — both
+// DashScope and DeepSeek speak the OpenAI chat-completions dialect.
+func NewDeepSeekClientFromEnv() *QwenClient {
+	key := strings.TrimSpace(os.Getenv("DEEPSEEK_API_KEY"))
+	if key == "" {
+		return nil
+	}
+	base := strings.TrimSpace(os.Getenv("DEEPSEEK_BASE_URL"))
+	if base == "" {
+		base = defaultDeepSeekBaseURL
+	}
+	model := strings.TrimSpace(os.Getenv("DEEPSEEK_MODEL"))
+	if model == "" {
+		model = defaultDeepSeekModel
 	}
 	return &QwenClient{
 		BaseURL:   base,
@@ -156,12 +186,18 @@ func (q *QwenClient) Summarize(ctx context.Context, level Level, msgs []Message)
 	return strings.TrimSpace(parsed.Choices[0].Message.Content), nil
 }
 
-// DefaultCompactor returns the production compactor: Qwen when
-// DASHSCOPE_API_KEY is set, otherwise the deterministic fail-safe. Trigger
-// sites (CompleteTask hook, chat threshold) construct their Archiver with
-// this so wiring Qwen is purely an env-config change.
+// DefaultCompactor returns the production compactor. It prefers Qwen (the
+// 记忆总管 role) when DASHSCOPE_API_KEY is set, then DeepSeek when
+// DEEPSEEK_API_KEY is set, and finally falls back to the deterministic
+// fail-safe. Whichever model is chosen, ModelCompactor still degrades to the
+// deterministic levels per-gradient on any call failure — a model outage can
+// never drop the original transcript or break the calling flow. Wiring a
+// model is purely an env-config change.
 func DefaultCompactor() Compactor {
 	if client := NewQwenClientFromEnv(); client != nil {
+		return ModelCompactor{Client: client}
+	}
+	if client := NewDeepSeekClientFromEnv(); client != nil {
 		return ModelCompactor{Client: client}
 	}
 	return DeterministicCompactor{}
