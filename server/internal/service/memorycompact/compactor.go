@@ -154,10 +154,10 @@ func (d DeterministicCompactor) render(in Input, generator string) Levels {
 }
 
 // renderDigest emits one bounded block per message, oldest first.
-func renderDigest(msgs []Message, cap int) string {
+func renderDigest(msgs []Message, limit int) string {
 	var b strings.Builder
 	for _, m := range msgs {
-		fmt.Fprintf(&b, "[%s] %s: %s\n", m.CreatedAt.UTC().Format("2006-01-02 15:04"), speaker(m), truncate(collapse(m.Content), cap))
+		fmt.Fprintf(&b, "[%s] %s: %s\n", m.CreatedAt.UTC().Format("2006-01-02 15:04"), speaker(m), truncate(collapse(m.Content), limit))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

@@ -32,8 +32,13 @@ comment 原文，只新增摘要 + 翻转可空标记列。**
 
 ### B. 归档服务 — `internal/service/memorycompact/`
 - `Compactor` 接口 + `DeterministicCompactor`（无模型、无网络、**永不报错**的
-  fail-safe 兜底）+ `ModelCompactor`（包 `ModelClient` 抽象，即未来 Qwen bridge；
-  逐级失败时自动回落到 deterministic）。
+  fail-safe 兜底）+ `ModelCompactor`（包 `ModelClient` 抽象；逐级失败时自动回落
+  到 deterministic）。
+- **Qwen 已接入** — `qwen.go` `QwenClient`：DashScope OpenAI-compatible
+  `/chat/completions`（与 `line_bridge.py` 记忆总管同一通道与 T1..T4 提示词）。
+  `DefaultCompactor()`：设了 `DASHSCOPE_API_KEY` 用 Qwen，否则 deterministic。
+  env：`DASHSCOPE_API_KEY`（必填）、`DASHSCOPE_BASE_URL`（默认 compatible-mode）、
+  `QWEN_MODEL`（默认 qwen-plus）。Qwen 故障逐级回落，不阻断止血。
 - `Archiver`：先把每一级落库，**全部成功后才** 翻转 compaction 标记。任一步失败 →
   不翻标记 → daemon 照旧 resume → 无止血但无损。
 - `compactor_test.go`：覆盖四级生成、梯度递减、排序、关键行提取、模型回落、
@@ -83,15 +88,18 @@ comment 原文，只新增摘要 + 翻转可空标记列。**
 6. **E. retry 连续失败 fresh** — 已有 `CreateRetryTask` 对
    `codex_semantic_inactivity` 置 `force_fresh_session`；扩展为连续 N 次失败也置位。
 
-## 构建 / 测试（需在带 Go 工具链的环境执行；本沙箱无 go/sqlc/psql）
+## 构建 / 测试（已在 go1.26.1 + sqlc v1.31.1 下跑通）
 
 ```
 cd server
-sqlc generate                 # 由 memory_archive.sql 生成 Go
-go build ./...
-go test ./internal/service/memorycompact/...
+sqlc generate                 # 由 memory_archive.sql 生成 Go（已提交生成结果）
+go build ./internal/handler/ ./pkg/db/generated/   # ✓ 编译通过
+go test ./internal/service/memorycompact/...        # ✓ 15/15 PASS
 # 迁移：migrate up 跑到 112；回滚 down 到 111 应干净
 ```
+
+> 全量 `go build ./...` 受本机磁盘 100% 限制未跑完（仅余 ~130M），但所有
+> 受影响的包（handler / generated db / memorycompact）均已单独编译 + vet + 测试通过。
 
 ## 验收映射
 
