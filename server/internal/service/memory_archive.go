@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -10,6 +12,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/service/memorycompact"
 	"github.com/multica-ai/multica/server/internal/util"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
 // archiveCommentFetchLimit bounds how many of an issue's most-relevant
@@ -147,16 +150,65 @@ func (m *MemoryArchiveService) ArchiveChatSession(ctx context.Context, session d
 	return m.runArchive(ctx, in, util.UUIDToString(session.WorkspaceID), util.UUIDToString(session.AgentID))
 }
 
+// ArchiveTask writes a scope_type='task' archive for a completed task so the
+// run itself is traceable through the archive index (audit requirement). The
+// source is the task's trigger context + final output; originals are never
+// touched. Best-effort and fail-safe. MarkCompacted for the 'task' scope is a
+// no-op (there is no per-task marker column) — the archive rows are the record.
+func (m *MemoryArchiveService) ArchiveTask(ctx context.Context, task db.AgentTaskQueue, result []byte) error {
+	if m == nil || !task.ID.Valid {
+		return nil
+	}
+	var workspaceID pgtype.UUID
+	switch {
+	case task.IssueID.Valid:
+		issue, err := m.Queries.GetIssue(ctx, task.IssueID)
+		if err != nil {
+			return fmt.Errorf("get issue: %w", err)
+		}
+		workspaceID = issue.WorkspaceID
+	case task.ChatSessionID.Valid:
+		cs, err := m.Queries.GetChatSession(ctx, task.ChatSessionID)
+		if err != nil {
+			return fmt.Errorf("get chat session: %w", err)
+		}
+		workspaceID = cs.WorkspaceID
+	default:
+		return nil
+	}
+	msgs := taskResultToMessages(task, result)
+	if len(msgs) == 0 {
+		return nil
+	}
+	in := memorycompact.Input{
+		ScopeType: "task",
+		ScopeID:   util.UUIDToString(task.ID),
+		Messages:  msgs,
+	}
+	return m.runArchive(ctx, in, util.UUIDToString(workspaceID), util.UUIDToString(task.AgentID))
+}
+
 // IssueMemorySummary returns the low-gradient (T1 + T2) summary to inject
-// into a fresh session's prompt, or "" when the issue has no archive. Always
-// best-effort: any error yields "".
+// into a fresh issue session's prompt, or "" when there is no archive.
 func (m *MemoryArchiveService) IssueMemorySummary(ctx context.Context, issueID pgtype.UUID) string {
-	if m == nil || !issueID.Valid {
+	return m.scopeSummary(ctx, "issue", issueID)
+}
+
+// ChatSessionMemorySummary returns the T1+T2 summary to inject into a fresh
+// chat session's prompt after compaction, or "" when there is no archive.
+func (m *MemoryArchiveService) ChatSessionMemorySummary(ctx context.Context, chatSessionID pgtype.UUID) string {
+	return m.scopeSummary(ctx, "chat_session", chatSessionID)
+}
+
+// scopeSummary builds the low-gradient (T1 + T2) summary for any scope.
+// Always best-effort: any error yields "".
+func (m *MemoryArchiveService) scopeSummary(ctx context.Context, scopeType string, id pgtype.UUID) string {
+	if m == nil || !id.Valid {
 		return ""
 	}
-	scope := util.UUIDToString(issueID)
-	t1 := m.latestLevel(ctx, scope, string(memorycompact.LevelT1))
-	t2 := m.latestLevel(ctx, scope, string(memorycompact.LevelT2))
+	scope := util.UUIDToString(id)
+	t1 := m.latestLevel(ctx, scopeType, scope, string(memorycompact.LevelT1))
+	t2 := m.latestLevel(ctx, scopeType, scope, string(memorycompact.LevelT2))
 	switch {
 	case t1 != "" && t2 != "":
 		return t1 + "\n\n" + t2
@@ -167,13 +219,13 @@ func (m *MemoryArchiveService) IssueMemorySummary(ctx context.Context, issueID p
 	}
 }
 
-func (m *MemoryArchiveService) latestLevel(ctx context.Context, scopeID, level string) string {
+func (m *MemoryArchiveService) latestLevel(ctx context.Context, scopeType, scopeID, level string) string {
 	id, err := util.ParseUUID(scopeID)
 	if err != nil {
 		return ""
 	}
 	row, err := m.Queries.GetLatestMemoryArchiveLevel(ctx, db.GetLatestMemoryArchiveLevelParams{
-		ScopeType: "issue",
+		ScopeType: scopeType,
 		ScopeID:   id,
 		Level:     level,
 	})
@@ -181,6 +233,40 @@ func (m *MemoryArchiveService) latestLevel(ctx context.Context, scopeID, level s
 		return ""
 	}
 	return row.Content
+}
+
+// taskResultToMessages builds the compactor input for a task-level archive:
+// the trigger context (what the run was asked to do) plus the final output.
+func taskResultToMessages(task db.AgentTaskQueue, result []byte) []memorycompact.Message {
+	var msgs []memorycompact.Message
+	if task.TriggerSummary.Valid && strings.TrimSpace(task.TriggerSummary.String) != "" {
+		msgs = append(msgs, memorycompact.Message{
+			Author:    "trigger",
+			Role:      "user",
+			Content:   task.TriggerSummary.String,
+			CreatedAt: task.CreatedAt.Time,
+		})
+	}
+	if out := strings.TrimSpace(extractTaskOutput(result)); out != "" {
+		msgs = append(msgs, memorycompact.Message{
+			Author:    "agent",
+			Role:      "assistant",
+			Content:   out,
+			CreatedAt: task.CompletedAt.Time,
+		})
+	}
+	return msgs
+}
+
+// extractTaskOutput pulls the agent's final output text from a completion
+// result payload, applying the same backslash-unescape as the comment path.
+// Returns "" on any parse failure (fail-safe).
+func extractTaskOutput(result []byte) string {
+	var payload protocol.TaskCompletedPayload
+	if err := json.Unmarshal(result, &payload); err != nil {
+		return ""
+	}
+	return util.UnescapeBackslashEscapes(payload.Output)
 }
 
 func (m *MemoryArchiveService) runArchive(ctx context.Context, in memorycompact.Input, workspaceID, agentID string) error {

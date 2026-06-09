@@ -191,6 +191,14 @@ func buildChatPrompt(task Task) string {
 	var b strings.Builder
 	b.WriteString("You are running as a chat assistant for a Multica workspace.\n")
 	b.WriteString("A user is chatting with you directly. Respond to their message.\n\n")
+	if strings.TrimSpace(task.MemorySummary) != "" {
+		// PL-91: this is a fresh session started after the chat history was
+		// compacted. Inject the T1/T2 summary + archive index so the new
+		// session keeps the earlier conversation context instead of seeing
+		// only the latest message. The full transcript is preserved and can
+		// be retrieved from the memory archive if deeper context is needed.
+		fmt.Fprintf(&b, "Earlier conversation context (compacted memory summary — the full history is archived, not lost):\n\n%s\n\n", strings.TrimSpace(task.MemorySummary))
+	}
 	fmt.Fprintf(&b, "User message:\n%s\n", task.ChatMessage)
 	// List attachments by id + filename so the agent can fetch them via
 	// the CLI. We deliberately do NOT inline the URL: chat attachments
