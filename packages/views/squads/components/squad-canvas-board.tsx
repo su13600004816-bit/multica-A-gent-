@@ -19,6 +19,7 @@ import {
   type Edge,
   type Connection,
   type NodeProps,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useTheme } from "@multica/ui/components/common/theme-provider";
@@ -173,11 +174,19 @@ function SquadRootNodeView({ data }: NodeProps<SquadRootNode>) {
 }
 
 // Member node — one agent / human, composed exactly like a SquadProfileCard
-// member row (ActorAvatar + name in text-sm font-medium + muted role).
+// member row (ActorAvatar + name in text-sm font-medium + muted role). Agent
+// members get a clickable affordance (cursor + hover border/bg) because a click
+// opens their 智能体详情 panel (PL-120); humans have no such panel so they stay
+// inert.
 function SquadMemberNodeView({ data }: NodeProps<SquadMemberNode>) {
+  const clickable = data.memberType === "agent";
   return (
     <div
-      className="w-[200px] rounded-lg border bg-background px-3 py-2.5 shadow-sm"
+      className={`w-[200px] rounded-lg border bg-background px-3 py-2.5 shadow-sm ${
+        clickable
+          ? "cursor-pointer transition-colors hover:border-ring/60 hover:bg-accent/40"
+          : ""
+      }`}
       style={statusBorderStyle(data.status)}
     >
       <Handle type="target" position={Position.Left} className={handleClass} />
@@ -294,6 +303,9 @@ interface BoardProps {
   leaderId: string;
   members: SquadMember[];
   getEntityName: (type: string, id: string) => string;
+  // Fired when an agent member node is clicked — the page opens that agent's
+  // 智能体详情 panel (PL-120). Human members don't trigger it.
+  onSelectAgent?: (agentId: string) => void;
 }
 
 function SquadCanvasFlow({
@@ -303,6 +315,7 @@ function SquadCanvasFlow({
   leaderId,
   members,
   getEntityName,
+  onSelectAgent,
 }: BoardProps) {
   const { t } = useT("squads");
   const { resolvedTheme } = useTheme();
@@ -442,6 +455,19 @@ function SquadCanvasFlow({
     [setEdges],
   );
 
+  // Click an agent member node → open its 智能体详情 panel. Dragging does NOT
+  // fire onNodeClick (ReactFlow distinguishes click from drag), so the board
+  // stays fully editable while clicks open the panel. Humans / root / free
+  // step nodes have no detail panel and are ignored.
+  const onNodeClick = useCallback<NodeMouseHandler<SquadFlowNode>>(
+    (_, node) => {
+      if (node.type === "squadMember" && node.data.memberType === "agent") {
+        onSelectAgent?.(node.data.memberId);
+      }
+    },
+    [onSelectAgent],
+  );
+
   const handleAddNode = useCallback(() => {
     stepCounter.current += 1;
     const n = stepCounter.current;
@@ -476,6 +502,7 @@ function SquadCanvasFlow({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         fitView
         fitViewOptions={{ padding: 0.25 }}
         proOptions={{ hideAttribution: true }}
