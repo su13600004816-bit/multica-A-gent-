@@ -65,11 +65,7 @@ func (m *MemoryArchiveService) ArchiveIssue(ctx context.Context, issueID, agentI
 	if err != nil {
 		return fmt.Errorf("get issue: %w", err)
 	}
-	comments, err := m.Queries.ListCommentsForIssue(ctx, db.ListCommentsForIssueParams{
-		IssueID:     issueID,
-		WorkspaceID: issue.WorkspaceID,
-		Limit:       archiveCommentFetchLimit,
-	})
+	comments, err := m.issueArchiveComments(ctx, issueID, issue.WorkspaceID, issue.MemoryCompactedAt)
 	if err != nil {
 		return fmt.Errorf("list comments: %w", err)
 	}
@@ -78,10 +74,12 @@ func (m *MemoryArchiveService) ArchiveIssue(ctx context.Context, issueID, agentI
 		// no history to inject would just lose context for no token saving).
 		return nil
 	}
+	msgs := commentsToMessages(comments)
+	msgs = m.withPriorSummary(ctx, "issue", issueID, issue.MemoryCompactedAt, msgs)
 	in := memorycompact.Input{
 		ScopeType: "issue",
 		ScopeID:   util.UUIDToString(issueID),
-		Messages:  commentsToMessages(comments),
+		Messages:  msgs,
 	}
 	return m.runArchive(ctx, in, util.UUIDToString(issue.WorkspaceID), util.UUIDToString(agentID))
 }
@@ -134,18 +132,20 @@ func (m *MemoryArchiveService) ArchiveChatSession(ctx context.Context, session d
 	if m == nil || !session.ID.Valid {
 		return nil
 	}
-	msgs, err := m.Queries.ListChatMessages(ctx, session.ID)
+	rows, err := m.Queries.ListChatMessages(ctx, session.ID)
 	if err != nil {
 		return fmt.Errorf("list chat messages: %w", err)
 	}
-	window := filterChatSince(msgs, session.CompactedAt)
+	window := filterChatSince(rows, session.CompactedAt)
 	if len(window) == 0 {
 		return nil
 	}
+	msgs := chatMessagesToMessages(window)
+	msgs = m.withPriorSummary(ctx, "chat_session", session.ID, session.CompactedAt, msgs)
 	in := memorycompact.Input{
 		ScopeType: "chat_session",
 		ScopeID:   util.UUIDToString(session.ID),
-		Messages:  chatMessagesToMessages(window),
+		Messages:  msgs,
 	}
 	return m.runArchive(ctx, in, util.UUIDToString(session.WorkspaceID), util.UUIDToString(session.AgentID))
 }
@@ -233,6 +233,50 @@ func (m *MemoryArchiveService) latestLevel(ctx context.Context, scopeType, scope
 		return ""
 	}
 	return row.Content
+}
+
+func (m *MemoryArchiveService) issueArchiveComments(ctx context.Context, issueID, workspaceID pgtype.UUID, compactedAt pgtype.Timestamptz) ([]db.Comment, error) {
+	if compactedAt.Valid {
+		return m.Queries.ListCommentsSinceForIssue(ctx, db.ListCommentsSinceForIssueParams{
+			IssueID:     issueID,
+			WorkspaceID: workspaceID,
+			CreatedAt:   compactedAt,
+			Limit:       archiveCommentFetchLimit,
+		})
+	}
+	return m.Queries.ListCommentsForIssue(ctx, db.ListCommentsForIssueParams{
+		IssueID:     issueID,
+		WorkspaceID: workspaceID,
+		Limit:       archiveCommentFetchLimit,
+	})
+}
+
+func (m *MemoryArchiveService) withPriorSummary(ctx context.Context, scopeType string, id pgtype.UUID, compactedAt pgtype.Timestamptz, msgs []memorycompact.Message) []memorycompact.Message {
+	if !compactedAt.Valid || len(msgs) == 0 {
+		return msgs
+	}
+	prior := strings.TrimSpace(m.scopeSummary(ctx, scopeType, id))
+	return prependPriorSummary(prior, compactedAt, msgs)
+}
+
+func prependPriorSummary(prior string, compactedAt pgtype.Timestamptz, msgs []memorycompact.Message) []memorycompact.Message {
+	prior = strings.TrimSpace(prior)
+	if prior == "" || !compactedAt.Valid || len(msgs) == 0 {
+		return msgs
+	}
+	createdAt := compactedAt.Time
+	if createdAt.IsZero() {
+		createdAt = msgs[0].CreatedAt
+	}
+	out := make([]memorycompact.Message, 0, len(msgs)+1)
+	out = append(out, memorycompact.Message{
+		Author:    "memory_archive",
+		Role:      "system",
+		Content:   "Previous compacted memory summary:\n" + prior,
+		CreatedAt: createdAt,
+	})
+	out = append(out, msgs...)
+	return out
 }
 
 // taskResultToMessages builds the compactor input for a task-level archive:
