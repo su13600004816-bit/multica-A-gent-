@@ -18,6 +18,28 @@
     "root_subtitle_one": "{{count}} member",
     "root_subtitle_other": "{{count}} members"
   },
+  "canvas_page": {
+    "card_title": "{{name}} Canvas",
+    "card_hint": "Open the canvas workbench",
+    "breadcrumb_root": "Canvas",
+    "breadcrumb_leaf": "Canvas Workbench",
+    "members_section": "Squad Members",
+    "board_section": "Line Task Board",
+    "board_empty": "No tasks linked to this squad yet",
+    "new_node_label": "New node",
+    "toolbar_add_node": "Add node",
+    "toolbar_delete": "Delete selected",
+    "toolbar_fit": "Fit view",
+    "toolbar_reset": "Reset layout",
+    "toolbar_hint": "Drag to move · connect · double-click to rename",
+    "status_backlog": "Backlog",
+    "status_todo": "Todo",
+    "status_in_progress": "In Progress",
+    "status_in_review": "In Review",
+    "status_done": "Done",
+    "status_blocked": "Blocked",
+    "status_cancelled": "Cancelled"
+  },
   "inspector": {
     "details_section": "Details",
     "archive_button": "Archive"
