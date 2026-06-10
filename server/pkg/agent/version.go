@@ -21,8 +21,10 @@ var MinVersions = map[string]string{
 // quick-create prompt that the agent runs depends on CLI behavior introduced
 // after this version (attachment URL handling, no-retry semantics on
 // `multica issue create` failure — see PR #1851); older daemons would either
-// double-create issues or mishandle pasted screenshot URLs. Treated as a hard
-// requirement: missing / unparsable / below this threshold all fail closed.
+// double-create issues or mishandle pasted screenshot URLs. Enforced against
+// published releases only: an empty (unreported) version fails closed and a
+// release below this threshold is rejected, but dev / HEAD builds pass — see
+// CheckMinCLIVersion.
 const MinQuickCreateCLIVersion = "0.2.20"
 
 // Errors returned by CheckMinCLIVersion. Callers branch on these to surface
@@ -32,32 +34,59 @@ var (
 	ErrCLIVersionTooOld  = errors.New("multica CLI version is below required minimum")
 )
 
-// devDescribeRe matches the `git describe --tags --always --dirty` output for
-// a build past the latest tag, e.g. `v0.2.15-235-gdaf0e935` (optionally with a
-// trailing `-dirty`). Daemons built from source (Makefile `make build` / `make
-// daemon`) report this shape; tagged releases are bare semver. Treating dev-
-// described daemons as OK keeps `make daemon` unblocked without weakening the
-// gate for staging or production users running stale stable releases.
-var devDescribeRe = regexp.MustCompile(`^v?\d+\.\d+\.\d+-\d+-g[0-9a-fA-F]+`)
-
-// CheckMinCLIVersion returns nil when `detected` parses as ≥ minimum. Returns
-// ErrCLIVersionMissing for empty or unparsable input, and ErrCLIVersionTooOld
-// when parsable but below the minimum. The caller can check for these
-// sentinel errors with errors.Is to drive the response shape.
+// isReleaseVersion reports whether v is a clean published release version of
+// the form X.Y.Z (optionally v-prefixed) with all-numeric components.
 //
-// Dev-built daemons (git-describe shape) always pass — the version string
-// itself is the shared signal, so the modal pre-check and this server gate
-// agree by construction without needing to compare separate env flags.
+// Anything else is a dev / HEAD / source build: the literal "dev" (the
+// ldflags fallback in cmd/multica/main.go when `git describe` is unavailable —
+// this is what the production multica-daemon reports), a bare git-describe
+// commit hash like `daf0e935` / `daf0e935-dirty` (`git describe --always` with
+// no reachable tag), or a `vX.Y.Z-N-gHASH` describe string past the latest tag
+// (`make build` / `make daemon`). Those builds sit at or ahead of HEAD by
+// construction, so they cannot be meaningfully ranked against a released
+// minimum — see CheckMinCLIVersion.
+func isReleaseVersion(v string) bool {
+	s := strings.TrimPrefix(strings.TrimSpace(v), "v")
+	parts := strings.Split(s, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, p := range parts {
+		if p == "" {
+			return false
+		}
+		for _, r := range p {
+			if r < '0' || r > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// CheckMinCLIVersion returns nil when `detected` satisfies the minimum. It
+// returns ErrCLIVersionMissing only when no version is reported at all (empty
+// string), and ErrCLIVersionTooOld for a published release strictly below the
+// minimum. The caller can check for these sentinel errors with errors.Is to
+// drive the response shape.
+//
+// Dev / HEAD / source builds (anything that is not a clean X.Y.Z release, per
+// isReleaseVersion) always pass: they are at or ahead of HEAD by construction,
+// so treating them as below a released threshold would wrongly lock out the
+// production daemon, which reports cli_version="dev". Only genuine published
+// releases are ranked numerically against the minimum.
 func CheckMinCLIVersion(detected string) error {
 	d := strings.TrimSpace(detected)
 	if d == "" {
 		return ErrCLIVersionMissing
 	}
-	if devDescribeRe.MatchString(d) {
+	if !isReleaseVersion(d) {
 		return nil
 	}
 	parsed, err := parseSemver(d)
 	if err != nil {
+		// isReleaseVersion already validated the X.Y.Z shape, so a parse
+		// failure here is an internal inconsistency. Fail closed.
 		return ErrCLIVersionMissing
 	}
 	min, err := parseSemver(MinQuickCreateCLIVersion)
