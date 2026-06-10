@@ -65,12 +65,19 @@ DONE_GATE_ISSUE_FIXTURE="$D/i.json" DONE_GATE_COMMENTS_FIXTURE="$D/c.json" DONE_
 # 3) X47 端到端:现役热路径 line_watchdog.py --emit-observability → 逐轮 cycle 账本 cycles.jsonl 落盘
 #    wiring 见 line_watchdog.py::emit_observability(build_cycle_ledger/write_cycle_ledger);
 #    落盘目录由 LINE_EVIDENCE_LEDGER_DIR 决定(离线指向临时目录,不污染生产)。
+#    ⚠️ 所有写路径都必须指到 $D:除 ledger 外,看门狗主循环在 emit 前还会写
+#    leader_audit / stage_transitions / status / heartbeat / state / fallback / cron-log。
+#    任一未重定向都会落 /home/fleet/line-config —— 在只读审计环境会 OSError 中断,
+#    在 ledger 之前就退出,cycles.jsonl 永远写不出来。下面把它们全部指到 $D。
 D=$(mktemp -d)
 printf '%s' '[{"id":"11111111-1111-1111-1111-111111111111","identifier":"PL-T1","status":"in_progress","assignee_id":"0f0013ea-a65d-4ab8-b1b4-17e14da8ab52","assignee_type":"squad","updated_at":"2026-06-10T00:00:00Z","created_at":"2026-06-09T00:00:00Z"}]' > "$D/issues.json"
 printf '%s' '[{"id":"0f0013ea-a65d-4ab8-b1b4-17e14da8ab52","name":"线小队-T03","leader_id":"b70d9b47-4243-4c91-9393-8034fe413ede"}]' > "$D/squads.json"
 WATCHDOG_DRY_RUN=1 WATCHDOG_NOW="2026-06-10T01:00:00Z" WATCHDOG_FIXTURE="$D/issues.json" \
   WATCHDOG_SQUADS_FIXTURE="$D/squads.json" WATCHDOG_ISSUE_LIMIT=2 \
   WATCHDOG_STATE="$D/state.json" WATCHDOG_STATUS_F="$D/status.json" WATCHDOG_HEARTBEAT_F="$D/hb.json" \
+  WATCHDOG_LEADER_AUDIT_F="$D/leader_audit.jsonl" WATCHDOG_STAGE_TRANS_F="$D/stage_transitions.jsonl" \
+  WATCHDOG_SCHEMA_DRIFT_DIR="$D/drift" WATCHDOG_FALLBACK_F="$D/fallback.jsonl" \
+  WATCHDOG_CRON_LOG="$D/cron.log" WATCHDOG_COORD_LOCK="$D/coord.lock" \
   LINE_EVIDENCE_LEDGER_DIR="$D/evidence" \
   python3 line_watchdog.py --emit-observability 2>&1 | grep -E "OBSERVABILITY_EMITTED"
 cat "$D/evidence/cycles.jsonl"   # → 每轮一行 cycle 账本(cycle_at/scanned/gate_status/...)
