@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Agent } from "@multica/core/types";
+import type { Agent, RuntimeDevice } from "@multica/core/types";
 
 import {
   buildNodePrompt,
+  checkAgentDispatchable,
   compileNodeToQueueRequest,
   isTerminal,
+  preflightLineDispatch,
   resolveAgentForExecutor,
+  resolveDispatchableAgentForExecutor,
   runWaves,
   taskStatusToCircuit,
   wsEventToCircuit,
@@ -76,6 +79,198 @@ describe("resolveAgentForExecutor", () => {
 
   it("returns undefined when the workspace has no agents", () => {
     expect(resolveAgentForExecutor("claude", [])).toBeUndefined();
+  });
+});
+
+describe("runtime version pre-flight (quick-create gate)", () => {
+  // Build a runtime row with a given online status + reported cli_version.
+  function runtime(id: string, status: "online" | "offline", cliVersion?: string): RuntimeDevice {
+    return {
+      id,
+      status,
+      metadata: cliVersion === undefined ? {} : { cli_version: cliVersion },
+    } as unknown as RuntimeDevice;
+  }
+
+  function rtMap(...rs: RuntimeDevice[]): Map<string, RuntimeDevice> {
+    return new Map(rs.map((r) => [r.id, r]));
+  }
+
+  function devNode(id: string, executor: "claude" | "codex" = "claude"): LineNode {
+    return {
+      id,
+      kind: "dev",
+      executor,
+      role: "dev",
+      mode: "write",
+      instruction: `run ${id}`,
+      ownedPaths: [`src/${id}.ts`],
+    };
+  }
+
+  describe("checkAgentDispatchable", () => {
+    it("blocks a `dev` cli_version runtime as missing (matches prod 422)", () => {
+      const a = agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r1" });
+      const c = checkAgentDispatchable(a, rtMap(runtime("r1", "online", "dev")));
+      expect(c.dispatchable).toBe(false);
+      expect(c.state).toBe("missing");
+      expect(c.current).toBe("dev");
+      expect(c.min).toBe("0.2.20");
+    });
+
+    it("blocks a runtime with no reported cli_version (missing)", () => {
+      const a = agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r1" });
+      const c = checkAgentDispatchable(a, rtMap(runtime("r1", "online")));
+      expect(c.dispatchable).toBe(false);
+      expect(c.state).toBe("missing");
+    });
+
+    it("blocks a too-old runtime", () => {
+      const a = agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r1" });
+      const c = checkAgentDispatchable(a, rtMap(runtime("r1", "online", "0.2.19")));
+      expect(c.dispatchable).toBe(false);
+      expect(c.state).toBe("too_old");
+      expect(c.current).toBe("0.2.19");
+    });
+
+    it("blocks an offline runtime even when its version would pass", () => {
+      const a = agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r1" });
+      const c = checkAgentDispatchable(a, rtMap(runtime("r1", "offline", "0.3.17")));
+      expect(c.dispatchable).toBe(false);
+      expect(c.online).toBe(false);
+      expect(c.state).toBe("ok");
+    });
+
+    it("passes an online runtime at/above the minimum", () => {
+      const a = agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r1" });
+      const c = checkAgentDispatchable(a, rtMap(runtime("r1", "online", "0.3.17")));
+      expect(c.dispatchable).toBe(true);
+      expect(c.state).toBe("ok");
+    });
+  });
+
+  describe("resolveDispatchableAgentForExecutor", () => {
+    it("prefers a qualified same-executor agent over an unqualified one", () => {
+      const agents = [
+        // First match by hint, but its runtime is `dev` → unqualified.
+        agent({ id: "a1", name: "Claude A", model: "claude-opus-4", runtime_id: "r-dev" }),
+        // Second same-executor match, on a healthy online runtime → qualified.
+        agent({ id: "a2", name: "Claude B", model: "claude-sonnet-4", runtime_id: "r-ok" }),
+      ];
+      const res = resolveDispatchableAgentForExecutor(
+        "claude",
+        agents,
+        rtMap(runtime("r-dev", "online", "dev"), runtime("r-ok", "online", "0.3.0")),
+      );
+      expect(res.ok).toBe(true);
+      expect(res.ok && res.agent.id).toBe("a2");
+    });
+
+    it("blocks (ok:false) with current/min when no agent qualifies", () => {
+      const agents = [
+        agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r-dev" }),
+      ];
+      const res = resolveDispatchableAgentForExecutor(
+        "claude",
+        agents,
+        rtMap(runtime("r-dev", "online", "dev")),
+      );
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.reason).toBe("missing");
+        expect(res.agent?.id).toBe("a1");
+        expect(res.runtimeId).toBe("r-dev");
+        expect(res.current).toBe("dev");
+        expect(res.min).toBe("0.2.20");
+      }
+    });
+
+    it("reports `no_agent` when the workspace has no agents", () => {
+      const res = resolveDispatchableAgentForExecutor("claude", [], rtMap());
+      expect(res.ok).toBe(false);
+      expect(res.ok ? null : res.reason).toBe("no_agent");
+    });
+  });
+
+  describe("preflightLineDispatch", () => {
+    it("blocks every node when the only online runtime is `dev` (the prod-FAIL case)", () => {
+      const agents = [
+        agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r-dev" }),
+        agent({ id: "a2", name: "Codex", model: "gpt-5-codex", runtime_id: "r-dev2" }),
+      ];
+      const blocks = preflightLineDispatch(
+        [devNode("n1", "claude"), devNode("n2", "codex")],
+        agents,
+        rtMap(runtime("r-dev", "online", "dev"), runtime("r-dev2", "online", "dev")),
+      );
+      expect(blocks).toHaveLength(2);
+      // Every block carries current/min so the log can name the gap.
+      for (const b of blocks) {
+        expect(b.reason).toBe("missing");
+        expect(b.current).toBe("dev");
+        expect(b.min).toBe("0.2.20");
+        expect(b.agentName).toBeTruthy();
+        expect(b.runtimeId).toBeTruthy();
+      }
+    });
+
+    it("flags too_old and offline distinctly", () => {
+      const agents = [
+        agent({ id: "a1", name: "Claude old", model: "claude-opus-4", runtime_id: "r-old" }),
+        agent({ id: "a2", name: "Claude off", model: "claude-sonnet-4", runtime_id: "r-off" }),
+      ];
+      const tooOld = preflightLineDispatch(
+        [devNode("n1", "claude")],
+        [agents[0]!],
+        rtMap(runtime("r-old", "online", "0.1.0")),
+      );
+      expect(tooOld[0]!.reason).toBe("too_old");
+      const offline = preflightLineDispatch(
+        [devNode("n2", "claude")],
+        [agents[1]!],
+        rtMap(runtime("r-off", "offline", "0.3.0")),
+      );
+      expect(offline[0]!.reason).toBe("offline");
+    });
+
+    it("returns no blocks when every node has an online, version-passing agent", () => {
+      const agents = [
+        agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r-ok" }),
+        agent({ id: "a2", name: "Codex", model: "gpt-5-codex", runtime_id: "r-ok2" }),
+      ];
+      const blocks = preflightLineDispatch(
+        [devNode("n1", "claude"), devNode("n2", "codex")],
+        agents,
+        rtMap(runtime("r-ok", "online", "0.3.0"), runtime("r-ok2", "online", "0.3.0")),
+      );
+      expect(blocks).toEqual([]);
+    });
+
+    it("gates dispatch: a blocked pre-flight never reaches quickCreateIssue", async () => {
+      // Mirror execute()'s guard: pre-flight first, and only run the wave loop
+      // when there are no blocks. With a `dev`-only workspace, the line must be
+      // refused before any issue/task is created.
+      const agents = [
+        agent({ id: "a1", name: "Claude", model: "claude-opus-4", runtime_id: "r-dev" }),
+      ];
+      const runtimes = rtMap(runtime("r-dev", "online", "dev"));
+      const nodes = [devNode("n1", "claude")];
+      const quickCreateIssue = vi.fn(async (nodeId: string) => `task-${nodeId}`);
+
+      const blocks = preflightLineDispatch(nodes, agents, runtimes);
+      if (blocks.length === 0) {
+        await runWaves([nodes], {
+          dispatchNode: async (n) => quickCreateIssue(n.id),
+          waitForWaveTerminal: async () => true,
+          isNodeBlocked: () => false,
+          log: () => {},
+          isCancelled: () => false,
+        });
+      }
+
+      expect(blocks.length).toBeGreaterThan(0);
+      expect(quickCreateIssue).not.toHaveBeenCalled();
+    });
   });
 });
 

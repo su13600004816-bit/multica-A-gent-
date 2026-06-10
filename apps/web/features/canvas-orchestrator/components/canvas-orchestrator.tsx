@@ -37,6 +37,7 @@ import {
 import { api } from "@multica/core/api";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useWSEvent } from "@multica/core/realtime";
+import { runtimeListOptions } from "@multica/core/runtimes";
 import type { Agent } from "@multica/core/types";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@multica/ui/components/ui/button";
@@ -54,7 +55,8 @@ import {
 import {
   compileNodeToQueueRequest,
   isTerminal,
-  resolveAgentForExecutor,
+  preflightLineDispatch,
+  resolveDispatchableAgentForExecutor,
   resolveExternalTaskId,
   runWaves,
   wsEventToCircuit,
@@ -107,6 +109,15 @@ function CanvasOrchestratorInner() {
     queryKey: ["agents", wsId],
     queryFn: () => api.listAgents({ workspace_id: wsId }),
   });
+  // Runtimes back the quick-create version gate: each agent's runtime must be
+  // online and report a CLI version >= MIN_QUICK_CREATE_CLI_VERSION, else
+  // `/api/issues/quick-create` 422s. We pre-flight against this BEFORE
+  // dispatching so a line never half-enqueues into a 422 (see execute()).
+  const { data: runtimes = [] } = useQuery(runtimeListOptions(wsId));
+  const runtimeById = useMemo(
+    () => new Map(runtimes.map((r) => [r.id, r])),
+    [runtimes],
+  );
 
   const [history, setHistory] = useState<CanvasHistory>(() => initHistory(EMPTY_SNAPSHOT));
   const [statusById, setStatusById] = useState<Record<string, CircuitStatus>>({});
@@ -312,6 +323,37 @@ function CanvasOrchestratorInner() {
       pushLog("✗ 工作区没有可用 agent，无法派发");
       return;
     }
+
+    // Pre-flight the quick-create runtime version gate for EVERY node before we
+    // create anything. If any node has no online agent whose runtime passes
+    // `min_version`, fail fast here — do NOT enqueue the first wave and eat a
+    // 422 (which would leave the line half-dispatched). We don't touch the
+    // server gate; we just refuse to dispatch a node that can't clear it.
+    const blocks = preflightLineDispatch(line.nodes, agents, runtimeById);
+    if (blocks.length > 0) {
+      for (const b of blocks) {
+        if (b.reason === "no_agent") {
+          pushLog(`  ✗ ${b.nodeId}: 找不到匹配 ${b.executor} 的 agent`);
+          continue;
+        }
+        const rt = b.runtimeId ? b.runtimeId.slice(0, 8) : "—";
+        const cur = b.current || "无";
+        const why =
+          b.reason === "offline"
+            ? "runtime 离线"
+            : b.reason === "missing"
+              ? "runtime 未上报合格 CLI 版本"
+              : "runtime CLI 版本过旧";
+        pushLog(
+          `  ✗ ${b.nodeId}: agent ${b.agentName ?? "—"} / runtime ${rt} ${why} (current=${cur} < min=${b.min})`,
+        );
+      }
+      pushLog(
+        `✗ 预检失败：${blocks.length} 个节点无合格在线 runtime（需 cli_version ≥ ${blocks[0]!.min}），已阻断执行，未派发任何任务`,
+      );
+      return;
+    }
+
     if (typeof window !== "undefined" && !window.confirm("将向 multica 任务队列派发真实任务（会触发 agent 运行）。确认执行?")) {
       return;
     }
@@ -328,12 +370,20 @@ function CanvasOrchestratorInner() {
     // rejects when quickCreateIssue fails — runWaves fails the wave closed in
     // the latter two cases so no downstream wave is dispatched.
     const dispatchNode = async (node: LineNode): Promise<string | null> => {
-      const agent = resolveAgentForExecutor(node.executor, agents);
-      if (!agent) {
+      // Re-resolve the same dispatchable agent the pre-flight cleared (online +
+      // version-gate passing), preferring a qualified same-executor agent. If
+      // it can't be resolved (e.g. a runtime went offline between pre-flight and
+      // here), fail closed so runWaves stops downstream waves.
+      const res = resolveDispatchableAgentForExecutor(node.executor, agents, runtimeById);
+      if (!res.ok) {
         setStatus(node.id, "failed");
-        pushLog(`  ✗ ${node.id}: 找不到匹配的 agent`);
+        const cur = res.current || "无";
+        pushLog(
+          `  ✗ ${node.id}: 无合格在线 runtime (agent ${res.agent?.name ?? "—"}, current=${cur} < min=${res.min})`,
+        );
         return null;
       }
+      const agent = res.agent;
       const req = compileNodeToQueueRequest(node, line.id, line.title, agent.id);
       try {
         const { task_id } = await api.quickCreateIssue(req);
@@ -366,7 +416,7 @@ function CanvasOrchestratorInner() {
       setRunning(false);
       pushLog("执行结束");
     }
-  }, [present, lineId, lineTitle, agents, pushLog, setStatus, waitForWaveTerminal]);
+  }, [present, lineId, lineTitle, agents, runtimeById, pushLog, setStatus, waitForWaveTerminal]);
 
   const stop = useCallback(() => {
     cancelRef.current = true;

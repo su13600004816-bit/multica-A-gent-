@@ -9,8 +9,13 @@
 // Everything here is pure: it builds the request payload and maps task/event
 // status → CircuitStatus. The React layer owns the api call + WS subscription.
 
-import type { Agent } from "@multica/core/types";
-import type { WSEventType } from "@multica/core/types";
+import type { Agent, RuntimeDevice, WSEventType } from "@multica/core/types";
+import {
+  MIN_QUICK_CREATE_CLI_VERSION,
+  checkQuickCreateCliVersion,
+  readRuntimeCliVersion,
+  type CliVersionState,
+} from "@multica/core/runtimes";
 
 import type { CircuitStatus } from "./circuit-status";
 import { resolveExternalTaskId, type LineExecutor, type LineNode } from "./line-ir";
@@ -61,18 +66,167 @@ const EXECUTOR_HINTS: Record<LineExecutor, string[]> = {
   codex: ["codex", "openai", "gpt", "o3", "o4"],
 };
 
+// Order the workspace agents by preference for an executor: agents whose
+// model/name matches the executor hints first (in their original order), then
+// every other agent as a fallback so a line can still run in a workspace whose
+// agents are named differently. The first element is what
+// `resolveAgentForExecutor` historically returned.
+function orderAgentsForExecutor(
+  executor: LineExecutor,
+  agents: readonly Agent[],
+): Agent[] {
+  const hints = EXECUTOR_HINTS[executor];
+  const matches: Agent[] = [];
+  const rest: Agent[] = [];
+  for (const a of agents) {
+    const model = (a.model ?? "").toLowerCase();
+    const name = (a.name ?? "").toLowerCase();
+    (hints.some((h) => model.includes(h) || name.includes(h)) ? matches : rest).push(a);
+  }
+  return [...matches, ...rest];
+}
+
 export function resolveAgentForExecutor(
   executor: LineExecutor,
   agents: readonly Agent[],
 ): Agent | undefined {
-  if (agents.length === 0) return undefined;
-  const hints = EXECUTOR_HINTS[executor];
-  const match = agents.find((a) => {
-    const model = (a.model ?? "").toLowerCase();
-    const name = (a.name ?? "").toLowerCase();
-    return hints.some((h) => model.includes(h) || name.includes(h));
-  });
-  return match ?? agents[0];
+  return orderAgentsForExecutor(executor, agents)[0];
+}
+
+// --- runtime version pre-flight (mirrors the quick-create modal gate) -------
+//
+// `/api/issues/quick-create` rejects with 422 `daemon_version_unsupported`
+// when the chosen agent's runtime reports a `cli_version` below
+// MIN_QUICK_CREATE_CLI_VERSION (or none / "dev"). The server is the
+// authoritative trust boundary; this is the SAME check the quick-create modal
+// runs so the canvas can fail-fast BEFORE creating real issues/tasks instead
+// of enqueuing the first wave and eating a 422. We do NOT touch the server
+// gate — we only avoid dispatching a node whose runtime can't pass it.
+
+export type RuntimeById = ReadonlyMap<string, RuntimeDevice>;
+
+// Why a node's preferred agent can't be dispatched. `no_agent` = the workspace
+// has no agents at all; the rest mirror the runtime version-gate states plus
+// an `offline` runtime (an offline runtime can't accept the task regardless of
+// its reported version).
+export type DispatchBlockReason = "no_agent" | "offline" | CliVersionState; // "missing" | "too_old"
+
+// Is this agent's runtime online AND at a CLI version the quick-create gate
+// accepts? Returns the resolved runtime + version diagnostics either way so the
+// caller can surface current/min in a log line.
+export function checkAgentDispatchable(
+  agent: Agent,
+  runtimeById: RuntimeById,
+): {
+  runtime: RuntimeDevice | undefined;
+  online: boolean;
+  current: string;
+  min: string;
+  state: CliVersionState;
+  dispatchable: boolean;
+} {
+  const runtime = runtimeById.get(agent.runtime_id);
+  const online = runtime?.status === "online";
+  const version = checkQuickCreateCliVersion(readRuntimeCliVersion(runtime?.metadata));
+  return {
+    runtime,
+    online,
+    current: version.current,
+    min: version.min,
+    state: version.state,
+    dispatchable: online && version.state === "ok",
+  };
+}
+
+export type DispatchResolution =
+  | { ok: true; agent: Agent; runtime: RuntimeDevice }
+  | {
+      ok: false;
+      reason: DispatchBlockReason;
+      // The preferred candidate we'd have used (null only when no_agent), so
+      // the log can name the agent/runtime that failed the gate.
+      agent: Agent | null;
+      runtimeId: string | null;
+      current: string;
+      min: string;
+    };
+
+// Resolve the agent to dispatch a node's executor onto, REQUIRING that its
+// runtime is online and passes the quick-create version gate. Among the
+// executor-ordered candidates the first dispatchable one wins, so a qualified
+// same-executor agent is preferred over an unqualified one. When none qualify,
+// returns the preferred candidate's diagnostics (current/min/reason) for the
+// caller to report.
+export function resolveDispatchableAgentForExecutor(
+  executor: LineExecutor,
+  agents: readonly Agent[],
+  runtimeById: RuntimeById,
+): DispatchResolution {
+  const ordered = orderAgentsForExecutor(executor, agents);
+  if (ordered.length === 0) {
+    return {
+      ok: false,
+      reason: "no_agent",
+      agent: null,
+      runtimeId: null,
+      current: "",
+      min: MIN_QUICK_CREATE_CLI_VERSION,
+    };
+  }
+  for (const candidate of ordered) {
+    const c = checkAgentDispatchable(candidate, runtimeById);
+    if (c.dispatchable) {
+      return { ok: true, agent: candidate, runtime: c.runtime! };
+    }
+  }
+  // None qualified — diagnose the preferred candidate so the log shows why.
+  const preferred = ordered[0]!;
+  const c = checkAgentDispatchable(preferred, runtimeById);
+  return {
+    ok: false,
+    reason: c.online ? c.state : "offline",
+    agent: preferred,
+    runtimeId: preferred.runtime_id,
+    current: c.current,
+    min: c.min,
+  };
+}
+
+// One node that cannot be dispatched, with everything a log line needs.
+export interface NodeDispatchBlock {
+  nodeId: string;
+  executor: LineExecutor;
+  agentName: string | null;
+  runtimeId: string | null;
+  reason: DispatchBlockReason;
+  current: string;
+  min: string;
+}
+
+// Pre-flight every node that will be executed: returns the blocking nodes (no
+// online, version-passing agent for the executor). Empty array => the whole
+// line can be dispatched. The component fails fast — and creates NO issues —
+// when this is non-empty.
+export function preflightLineDispatch(
+  nodes: readonly LineNode[],
+  agents: readonly Agent[],
+  runtimeById: RuntimeById,
+): NodeDispatchBlock[] {
+  const blocks: NodeDispatchBlock[] = [];
+  for (const node of nodes) {
+    const res = resolveDispatchableAgentForExecutor(node.executor, agents, runtimeById);
+    if (res.ok) continue;
+    blocks.push({
+      nodeId: node.id,
+      executor: node.executor,
+      agentName: res.agent?.name ?? null,
+      runtimeId: res.runtimeId,
+      reason: res.reason,
+      current: res.current,
+      min: res.min,
+    });
+  }
+  return blocks;
 }
 
 export function compileNodeToQueueRequest(
