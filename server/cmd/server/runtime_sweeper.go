@@ -311,7 +311,16 @@ func broadcastFailedTasks(ctx context.Context, queries *db.Queries, taskSvc *ser
 				if issue.Status == "in_progress" && !processedIssues[issueKey] {
 					processedIssues[issueKey] = true
 					if hasActive, herr := queries.HasActiveTaskForIssue(ctx, t.IssueID); herr == nil && !hasActive {
-						queries.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{ID: t.IssueID, Status: "todo", WorkspaceID: issue.WorkspaceID})
+						// CAS rollback: only reset to 'todo' if the issue is
+						// still 'in_progress', so a stale timeout reset cannot
+						// clobber a terminal status written concurrently by the
+						// leader (conflict A/C). Mirrors HandleFailedTasks.
+						queries.UpdateIssueStatusIfCurrent(ctx, db.UpdateIssueStatusIfCurrentParams{
+							NewStatus:      "todo",
+							ID:             t.IssueID,
+							WorkspaceID:    issue.WorkspaceID,
+							ExpectedStatus: "in_progress",
+						})
 					}
 				}
 			}

@@ -1211,6 +1211,35 @@ type UpdateIssueStatusParams struct {
 	WorkspaceID pgtype.UUID `json:"workspace_id"`
 }
 
+const updateIssueStatusIfCurrent = `-- name: UpdateIssueStatusIfCurrent :execrows
+UPDATE issue SET
+    status = $1,
+    updated_at = now()
+WHERE id = $2 AND workspace_id = $3 AND status = $4
+`
+
+type UpdateIssueStatusIfCurrentParams struct {
+	NewStatus      string      `json:"new_status"`
+	ID             pgtype.UUID `json:"id"`
+	WorkspaceID    pgtype.UUID `json:"workspace_id"`
+	ExpectedStatus string      `json:"expected_status"`
+}
+
+// Compare-and-swap on issue status: flip to new_status only when the issue is
+// STILL at expected_status. Returns the number of rows updated (0 when the
+// status moved out from under us). The watchdog/runtime sweeper uses this to
+// roll a stuck issue back to 'todo' without clobbering a terminal status the
+// squad leader wrote concurrently between our read and our write (conflict A/C:
+// a stale timeout-driven reset must never overwrite a fresh event-driven
+// 'done'/'cancelled'). Workspace_id is the SQL-layer tenant guard.
+func (q *Queries) UpdateIssueStatusIfCurrent(ctx context.Context, arg UpdateIssueStatusIfCurrentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateIssueStatusIfCurrent, arg.NewStatus, arg.ID, arg.WorkspaceID, arg.ExpectedStatus)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 // Workspace_id in the WHERE clause is a SQL-layer tenant guard; see DeleteIssue.
 func (q *Queries) UpdateIssueStatus(ctx context.Context, arg UpdateIssueStatusParams) (Issue, error) {
 	row := q.db.QueryRow(ctx, updateIssueStatus, arg.ID, arg.Status, arg.WorkspaceID)

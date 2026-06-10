@@ -1665,14 +1665,27 @@ func (s *TaskService) HandleFailedTasks(ctx context.Context, tasks []db.AgentTas
 							"error", checkErr,
 						)
 					} else if !hasActive {
-						if _, updateErr := s.Queries.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
-							ID:          t.IssueID,
-							Status:      "todo",
-							WorkspaceID: issue.WorkspaceID,
-						}); updateErr != nil {
+						// Compare-and-swap: only roll back to 'todo' if the issue
+						// is STILL 'in_progress'. Between the GetIssue read above
+						// and this write the squad leader may have finished and
+						// written a terminal status (done/cancelled); a stale
+						// timeout-driven reset must not clobber that fresh
+						// event-driven state (conflict A/C). rows==0 means the
+						// status moved under us — we intentionally do nothing.
+						rows, updateErr := s.Queries.UpdateIssueStatusIfCurrent(ctx, db.UpdateIssueStatusIfCurrentParams{
+							NewStatus:      "todo",
+							ID:             t.IssueID,
+							WorkspaceID:    issue.WorkspaceID,
+							ExpectedStatus: "in_progress",
+						})
+						if updateErr != nil {
 							slog.Warn("handle failed tasks: reset stuck issue failed",
 								"issue_id", issueKey,
 								"error", updateErr,
+							)
+						} else if rows == 0 {
+							slog.Info("handle failed tasks: issue status changed concurrently, skipping rollback",
+								"issue_id", issueKey,
 							)
 						}
 					}

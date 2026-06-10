@@ -145,7 +145,7 @@ type IssueCreateResult struct {
 //  8. Publish EventIssueCreated to the bus (payload via opts.BroadcastPayload).
 //  9. Capture the IssueCreated analytics event.
 //  10. Enqueue an agent task or trigger the squad leader when the issue is
-//      assigned and not in `backlog`.
+//     assigned and not in `backlog`.
 //
 // Validation that lives in the service (parent existence, project
 // workspace membership, parent → project back-fill) is enforced here so
@@ -391,7 +391,7 @@ func (s *IssueService) maybeEnqueueOnAssign(ctx context.Context, issue db.Issue,
 				"error", err)
 		}
 	}
-	if s.shouldEnqueueSquadLeaderOnAssign(ctx, issue) {
+	if s.shouldEnqueueSquadLeaderOnAssign(ctx, issue, creatorType, actorID) {
 		s.enqueueSquadLeaderTask(ctx, issue, pgtype.UUID{}, creatorType, actorID)
 	}
 }
@@ -419,11 +419,42 @@ func (s *IssueService) isAgentAssigneeReady(ctx context.Context, issue db.Issue)
 	return true
 }
 
-func (s *IssueService) shouldEnqueueSquadLeaderOnAssign(ctx context.Context, issue db.Issue) bool {
+// shouldEnqueueSquadLeaderOnAssign mirrors handler.shouldEnqueueSquadLeaderOnAssign,
+// including the assign-path self-trigger guard (conflict D): when the actor
+// creating/assigning the issue IS the squad's own leader agent, auto-firing the
+// leader would be a self-dispatch ("leader self-creates and self-assigns onto
+// its own squad"). Member actors, and any agent other than this squad's leader,
+// still trigger the leader normally.
+func (s *IssueService) shouldEnqueueSquadLeaderOnAssign(ctx context.Context, issue db.Issue, actorType, actorID string) bool {
 	if issue.Status == "backlog" {
 		return false
 	}
+	if s.actorIsSquadLeader(ctx, issue, actorType, actorID) {
+		return false
+	}
 	return s.isSquadLeaderReady(ctx, issue)
+}
+
+// actorIsSquadLeader reports whether the acting agent is the leader of the
+// squad the issue is assigned to. See handler.actorIsSquadLeader for the
+// rationale; kept here so the service-layer create path applies the same
+// self-dispatch guard. Fail-open: any non-agent actor or lookup error returns
+// false so only an unambiguous self-assign suppresses the trigger.
+func (s *IssueService) actorIsSquadLeader(ctx context.Context, issue db.Issue, actorType, actorID string) bool {
+	if actorType != "agent" {
+		return false
+	}
+	if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+		return false
+	}
+	squad, err := s.Queries.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
+		ID:          issue.AssigneeID,
+		WorkspaceID: issue.WorkspaceID,
+	})
+	if err != nil {
+		return false
+	}
+	return actorID == util.UUIDToString(squad.LeaderID)
 }
 
 func (s *IssueService) isSquadLeaderReady(ctx context.Context, issue db.Issue) bool {

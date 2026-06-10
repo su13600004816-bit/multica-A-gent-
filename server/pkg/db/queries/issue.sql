@@ -107,6 +107,19 @@ UPDATE issue SET
 WHERE id = $1 AND workspace_id = $3
 RETURNING *;
 
+-- name: UpdateIssueStatusIfCurrent :execrows
+-- Compare-and-swap on issue status: flip to @new_status only when the issue is
+-- STILL at @expected_status. Returns the number of rows updated (0 when the
+-- status moved out from under us). The watchdog/runtime sweeper uses this to
+-- roll a stuck issue back to 'todo' without clobbering a terminal status the
+-- squad leader wrote concurrently between our read and our write (conflict A/C:
+-- a stale timeout-driven reset must never overwrite a fresh event-driven
+-- 'done'/'cancelled'). Workspace_id is the SQL-layer tenant guard.
+UPDATE issue SET
+    status = @new_status,
+    updated_at = now()
+WHERE id = @id AND workspace_id = @workspace_id AND status = @expected_status;
+
 -- name: CreateIssueWithOrigin :one
 INSERT INTO issue (
     workspace_id, title, description, status, priority,
