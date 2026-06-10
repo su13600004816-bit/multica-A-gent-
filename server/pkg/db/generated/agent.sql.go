@@ -1671,6 +1671,33 @@ func (q *Queries) HasPendingTaskForIssueAndAgent(ctx context.Context, arg HasPen
 	return has_pending, err
 }
 
+const hasTaskForTriggerCommentAndAgent = `-- name: HasTaskForTriggerCommentAndAgent :one
+SELECT count(*) > 0 AS has_task FROM agent_task_queue
+WHERE trigger_comment_id = $1 AND agent_id = $2
+`
+
+type HasTaskForTriggerCommentAndAgentParams struct {
+	TriggerCommentID pgtype.UUID `json:"trigger_comment_id"`
+	AgentID          pgtype.UUID `json:"agent_id"`
+}
+
+// Single-execution lock keyed to the *trigger comment*. Returns true if the
+// given comment has ALREADY produced a task for this agent, regardless of that
+// task's current status (queued, running, done, cancelled — any). Unlike
+// HasPendingTaskForIssueAndAgent (which only blocks while a task is still
+// queued/dispatched), this prevents a single comment from spawning a *second*
+// run for the same agent after the first one already ran or completed — e.g.
+// when the comment is edited (UpdateComment re-enters the trigger path) or when
+// the squad leader is re-routed onto the same PASS comment. This is the
+// structural guard against the leader→@agent→run→leader storm where one PASS
+// comment keeps pulling the next round.
+func (q *Queries) HasTaskForTriggerCommentAndAgent(ctx context.Context, arg HasTaskForTriggerCommentAndAgentParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasTaskForTriggerCommentAndAgent, arg.TriggerCommentID, arg.AgentID)
+	var has_task bool
+	err := row.Scan(&has_task)
+	return has_task, err
+}
+
 const linkTaskToIssue = `-- name: LinkTaskToIssue :exec
 UPDATE agent_task_queue
 SET issue_id = $2
