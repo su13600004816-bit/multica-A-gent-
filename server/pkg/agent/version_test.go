@@ -62,7 +62,16 @@ func TestCheckMinCLIVersion(t *testing.T) {
 		{"tagged release above minimum", "0.3.1", nil},
 		{"tagged release below minimum", "v0.2.15", ErrCLIVersionTooOld},
 		{"empty string", "", ErrCLIVersionMissing},
-		{"unparsable", "not-a-version", ErrCLIVersionMissing},
+		// Production daemon: ldflags fallback when `git describe` is
+		// unavailable. Must pass — this is the regression this fix targets.
+		{"literal dev build", "dev", nil},
+		// `git describe --always` with no reachable tag: bare commit hash,
+		// optionally -dirty. Also a HEAD build → pass.
+		{"bare describe commit hash", "daf0e935", nil},
+		{"bare describe commit hash dirty", "daf0e935-dirty", nil},
+		// Any other non-release string is treated as a dev/HEAD build, not a
+		// stale release — pass rather than fail closed.
+		{"non-release string", "not-a-version", nil},
 		{"git-describe dev build past old tag", "v0.2.15-235-gdaf0e935", nil},
 		{"git-describe dirty dev build", "v0.2.15-235-gdaf0e935-dirty", nil},
 		{"git-describe dev build past current tag", "v0.2.20-3-gabc1234", nil},
