@@ -353,7 +353,12 @@ function CanvasOrchestratorInner() {
       await runWaves(waves, {
         dispatchNode,
         waitForWaveTerminal,
-        isNodeFailed: (id) => statusRef.current[id] === "failed",
+        // A node is wave-blocking if it settled failed OR cancelled (mapped to
+        // `blocked` by wsEventToCircuit). Either must stop downstream waves.
+        isNodeBlocked: (id) => {
+          const s = statusRef.current[id];
+          return s === "failed" || s === "blocked";
+        },
         log: pushLog,
         isCancelled: () => cancelRef.current,
       });

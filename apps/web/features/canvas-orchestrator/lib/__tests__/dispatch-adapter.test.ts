@@ -10,6 +10,7 @@ import {
   taskStatusToCircuit,
   wsEventToCircuit,
 } from "../dispatch-adapter";
+import type { CircuitStatus } from "../circuit-status";
 import type { LineNode } from "../line-ir";
 
 const writeNode: LineNode = {
@@ -100,7 +101,8 @@ describe("wsEventToCircuit", () => {
     expect(wsEventToCircuit("task:progress")).toBe("running");
     expect(wsEventToCircuit("task:completed")).toBe("done");
     expect(wsEventToCircuit("task:failed")).toBe("failed");
-    expect(wsEventToCircuit("task:cancelled")).toBe("neutral");
+    // A cancelled task is a wave-blocking terminal, not a passing one.
+    expect(wsEventToCircuit("task:cancelled")).toBe("blocked");
   });
 
   it("ignores unrelated events", () => {
@@ -115,17 +117,19 @@ describe("taskStatusToCircuit", () => {
     expect(taskStatusToCircuit("running")).toBe("running");
     expect(taskStatusToCircuit("completed")).toBe("done");
     expect(taskStatusToCircuit("failed")).toBe("failed");
-    expect(taskStatusToCircuit("cancelled")).toBe("neutral");
+    expect(taskStatusToCircuit("cancelled")).toBe("blocked");
     expect(taskStatusToCircuit("some_future_state")).toBe("neutral");
     expect(taskStatusToCircuit(undefined)).toBe("neutral");
   });
 });
 
 describe("isTerminal", () => {
-  it("treats done/failed/neutral as terminal", () => {
+  it("treats done/failed/neutral/blocked as terminal", () => {
     expect(isTerminal("done")).toBe(true);
     expect(isTerminal("failed")).toBe(true);
     expect(isTerminal("neutral")).toBe(true);
+    // cancelled → blocked is terminal so the wave doesn't wait out the timeout.
+    expect(isTerminal("blocked")).toBe(true);
     expect(isTerminal("running")).toBe(false);
     expect(isTerminal("pending")).toBe(false);
   });
@@ -161,7 +165,7 @@ describe("runWaves (fail-closed wave gating)", () => {
     await runWaves([[node("w1")], [node("w2")]], {
       dispatchNode: makeDispatch(quickCreateIssue),
       waitForWaveTerminal: async () => true,
-      isNodeFailed: () => false,
+      isNodeBlocked: () => false,
       log: () => {},
       isCancelled: () => false,
     });
@@ -181,7 +185,7 @@ describe("runWaves (fail-closed wave gating)", () => {
     await runWaves([[node("a"), node("b")], [node("c")]], {
       dispatchNode: makeDispatch(quickCreateIssue),
       waitForWaveTerminal: async () => true,
-      isNodeFailed: () => false,
+      isNodeBlocked: () => false,
       log: () => {},
       isCancelled: () => false,
     });
@@ -201,7 +205,7 @@ describe("runWaves (fail-closed wave gating)", () => {
     await runWaves([[node("w1")], [node("w2")]], {
       dispatchNode,
       waitForWaveTerminal: async () => true,
-      isNodeFailed: () => false,
+      isNodeBlocked: () => false,
       log: () => {},
       isCancelled: () => false,
     });
@@ -220,7 +224,7 @@ describe("runWaves (fail-closed wave gating)", () => {
     await runWaves([[node("w1")], [node("w2")], [node("w3")]], {
       dispatchNode: makeDispatch(quickCreateIssue),
       waitForWaveTerminal: async () => true,
-      isNodeFailed: () => false,
+      isNodeBlocked: () => false,
       log: () => {},
       isCancelled: () => false,
     });
@@ -234,12 +238,51 @@ describe("runWaves (fail-closed wave gating)", () => {
     await runWaves([[node("w1")], [node("w2")]], {
       dispatchNode: makeDispatch(quickCreateIssue),
       waitForWaveTerminal: async () => true,
-      isNodeFailed: (id) => id === "w1",
+      isNodeBlocked: (id) => id === "w1",
       log: () => {},
       isCancelled: () => false,
     });
 
     expect(quickCreateIssue).toHaveBeenCalledTimes(1);
+    expect(quickCreateIssue).not.toHaveBeenCalledWith("w2");
+  });
+
+  it("does NOT advance when a first-wave node is cancelled via WS (task:cancelled)", async () => {
+    // The audit gap this covers: a real backend `task:cancelled` event used to
+    // map to `neutral` (a PASSING terminal), so a cancelled upstream node let
+    // the next wave enqueue. This wires the genuine mapping end-to-end —
+    // wsEventToCircuit("task:cancelled") → status mirror → isTerminal →
+    // isNodeBlocked — exactly as the component does, and asserts the second
+    // wave never calls quickCreateIssue.
+    const quickCreateIssue = vi.fn(async (nodeId: string) => `task-${nodeId}`);
+    const statusMirror: Record<string, CircuitStatus> = {};
+
+    const dispatchNode = async (n: LineNode): Promise<string | null> => {
+      const taskId = await quickCreateIssue(n.id);
+      // First-wave node receives a `task:cancelled` WS event, mapped the same
+      // way the live colouring path maps it.
+      if (n.id === "w1") statusMirror[n.id] = wsEventToCircuit("task:cancelled")!;
+      return taskId;
+    };
+    const isNodeBlocked = (id: string) => {
+      const s = statusMirror[id];
+      return s === "failed" || s === "blocked";
+    };
+
+    await runWaves([[node("w1")], [node("w2")]], {
+      dispatchNode,
+      // Cancelled is terminal, so waitForWaveTerminal would resolve true here.
+      waitForWaveTerminal: async () => true,
+      isNodeBlocked,
+      log: () => {},
+      isCancelled: () => false,
+    });
+
+    // Sanity-check the mapping the gate relies on, then the gating outcome.
+    expect(wsEventToCircuit("task:cancelled")).toBe("blocked");
+    expect(isTerminal("blocked")).toBe(true);
+    expect(quickCreateIssue).toHaveBeenCalledTimes(1);
+    expect(quickCreateIssue).toHaveBeenCalledWith("w1");
     expect(quickCreateIssue).not.toHaveBeenCalledWith("w2");
   });
 
@@ -249,7 +292,7 @@ describe("runWaves (fail-closed wave gating)", () => {
     await runWaves([[node("w1")], [node("w2")]], {
       dispatchNode: makeDispatch(quickCreateIssue),
       waitForWaveTerminal: async () => false, // timeout / cancel
-      isNodeFailed: () => false,
+      isNodeBlocked: () => false,
       log: () => {},
       isCancelled: () => false,
     });
@@ -264,7 +307,7 @@ describe("runWaves (fail-closed wave gating)", () => {
     await runWaves([[node("w1")]], {
       dispatchNode: makeDispatch(quickCreateIssue),
       waitForWaveTerminal: async () => true,
-      isNodeFailed: () => false,
+      isNodeBlocked: () => false,
       log: () => {},
       isCancelled: () => true,
     });

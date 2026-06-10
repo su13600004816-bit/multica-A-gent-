@@ -106,7 +106,11 @@ export function wsEventToCircuit(event: WSEventType): CircuitStatus | undefined 
     case "task:failed":
       return "failed";
     case "task:cancelled":
-      return "neutral";
+      // A cancelled task is a wave-blocking terminal, NOT a passing one: an
+      // upstream node that was cancelled must stop downstream nodes from being
+      // enqueued (see runWaves). It is mapped to `blocked`, distinct from the
+      // passing `neutral` terminal.
+      return "blocked";
     default:
       return undefined;
   }
@@ -128,7 +132,10 @@ export function taskStatusToCircuit(status: string | undefined): CircuitStatus {
     case "failed":
       return "failed";
     case "cancelled":
-      return "neutral";
+      // Wave-blocking terminal — see wsEventToCircuit. Kept distinct from the
+      // `neutral` enum-drift fallback below so a snapshot reconcile gates waves
+      // the same way a live `task:cancelled` event does.
+      return "blocked";
     default:
       return "neutral";
   }
@@ -138,6 +145,10 @@ const TERMINAL: ReadonlySet<CircuitStatus> = new Set<CircuitStatus>([
   "done",
   "failed",
   "neutral",
+  // A cancelled node (mapped to `blocked`) is terminal, so waitForWaveTerminal
+  // resolves immediately rather than burning the 15-min wave timeout. runWaves
+  // then gates on it via isNodeBlocked.
+  "blocked",
 ]);
 
 export function isTerminal(status: CircuitStatus): boolean {
@@ -166,8 +177,10 @@ export interface WaveRunnerDeps {
   // Resolve true once every live node reached a terminal status; false on
   // timeout or cancellation.
   waitForWaveTerminal: (liveNodeIds: string[]) => Promise<boolean>;
-  // Did a node settle in the "failed" terminal state (via WS)?
-  isNodeFailed: (nodeId: string) => boolean;
+  // Did a node settle in a wave-blocking terminal state (via WS) — i.e.
+  // `failed` OR `cancelled`/`blocked`? Either must stop downstream waves: a
+  // cancelled upstream node is no more "done" than a failed one.
+  isNodeBlocked: (nodeId: string) => boolean;
   log: (message: string) => void;
   isCancelled: () => boolean;
 }
@@ -214,10 +227,10 @@ export async function runWaves(
       deps.log("⏹ 已停止");
       return;
     }
-    const failed = liveNodeIds.filter((id) => deps.isNodeFailed(id));
-    if (!ok || failed.length > 0) {
+    const blocked = liveNodeIds.filter((id) => deps.isNodeBlocked(id));
+    if (!ok || blocked.length > 0) {
       deps.log(
-        `层 ${w + 1} 未全部通过${failed.length ? `（失败: ${failed.join(", ")}）` : "（超时）"}，停止后续层`,
+        `层 ${w + 1} 未全部通过${blocked.length ? `（失败/取消: ${blocked.join(", ")}）` : "（超时）"}，停止后续层`,
       );
       return;
     }
