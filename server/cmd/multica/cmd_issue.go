@@ -352,6 +352,7 @@ func init() {
 	issueCommentAddCmd.Flags().String("content-file", "", "Read comment content from a UTF-8 file (preserves multi-line content verbatim; use this on Windows when stdin piping mangles non-ASCII bytes)")
 	issueCommentAddCmd.Flags().String("parent", "", "Parent comment ID (reply to a specific comment)")
 	issueCommentAddCmd.Flags().StringSlice("attachment", nil, "File path(s) to attach (can be specified multiple times)")
+	issueCommentAddCmd.Flags().Bool("no-trigger", false, "Post a visible comment without waking any agent (sets suppress_triggers: no assignee, squad-leader, or @mention run fires)")
 	issueCommentAddCmd.Flags().String("output", "json", "Output format: table or json")
 
 	// issue search
@@ -1208,6 +1209,11 @@ func runIssueCommentAdd(cmd *cobra.Command, args []string) error {
 	}
 	if len(attachmentIDs) > 0 {
 		body["attachment_ids"] = attachmentIDs
+	}
+	// --no-trigger posts a visible comment that wakes no agent: the server gates
+	// all assignee/squad-leader/@mention trigger paths on suppress_triggers.
+	if noTrigger, _ := cmd.Flags().GetBool("no-trigger"); noTrigger {
+		body["suppress_triggers"] = true
 	}
 	var result map[string]any
 	if err := client.PostJSON(ctx, "/api/issues/"+issueID+"/comments", body, &result); err != nil {
