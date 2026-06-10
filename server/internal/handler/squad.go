@@ -995,11 +995,49 @@ func commentMentionsAnyone(content string) bool {
 // trigger the squad leader. Mirrors shouldEnqueueAgentTask: backlog issues
 // are skipped (parking lot), and the leader agent must have a runtime and
 // not be archived.
-func (h *Handler) shouldEnqueueSquadLeaderOnAssign(ctx context.Context, issue db.Issue) bool {
+//
+// Self-trigger guard (assign path, conflict D): when the actor performing the
+// assignment IS the squad's own leader agent, the assignment would make the
+// leader dispatch itself (leader creates/assigns an issue onto its own squad →
+// it gets enqueued as leader of that same squad). This is the assign-path
+// analogue of the comment-path lastTaskWasLeader guard in
+// shouldEnqueueSquadLeaderOnComment. The two paths keep independent rules: the
+// comment guard is role-aware (a leader acting as worker must still wake the
+// leader role), whereas the assign guard keys purely on actor identity — a
+// leader assigning work onto its own squad is always self-dispatch and must
+// not auto-fire. A human, or any agent other than this squad's leader, still
+// triggers the leader normally.
+func (h *Handler) shouldEnqueueSquadLeaderOnAssign(ctx context.Context, issue db.Issue, actorType, actorID string) bool {
 	if issue.Status == "backlog" {
 		return false
 	}
+	if h.actorIsSquadLeader(ctx, issue, actorType, actorID) {
+		return false
+	}
 	return h.isSquadLeaderReady(ctx, issue)
+}
+
+// actorIsSquadLeader reports whether the acting agent is the leader of the
+// squad the issue is assigned to. Used by the assign-path self-trigger guard
+// to stop a squad leader from auto-dispatching itself when it assigns work
+// onto its own squad. Returns false for member actors, non-squad issues, and
+// any lookup error (fail-open: only an unambiguous self-assign suppresses the
+// trigger).
+func (h *Handler) actorIsSquadLeader(ctx context.Context, issue db.Issue, actorType, actorID string) bool {
+	if actorType != "agent" {
+		return false
+	}
+	if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+		return false
+	}
+	squad, err := h.Queries.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
+		ID:          issue.AssigneeID,
+		WorkspaceID: issue.WorkspaceID,
+	})
+	if err != nil {
+		return false
+	}
+	return actorID == uuidToString(squad.LeaderID)
 }
 
 // isSquadLeaderReady returns true when the issue is assigned to a squad whose

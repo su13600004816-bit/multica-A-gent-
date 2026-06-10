@@ -2425,8 +2425,10 @@ func (h *Handler) UpdateIssue(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Squad assign: trigger the squad leader, respecting the backlog
-		// parking-lot rule used by agent assignment.
-		if h.shouldEnqueueSquadLeaderOnAssign(r.Context(), issue) {
+		// parking-lot rule used by agent assignment. The actor is passed so the
+		// assign-path self-trigger guard can suppress a leader dispatching
+		// itself onto its own squad (conflict D).
+		if h.shouldEnqueueSquadLeaderOnAssign(r.Context(), issue, actorType, actorID) {
 			h.enqueueSquadLeaderTask(r.Context(), issue, pgtype.UUID{}, actorType, actorID)
 		}
 	}
@@ -2916,7 +2918,7 @@ func (h *Handler) BatchUpdateIssues(w http.ResponseWriter, r *http.Request) {
 			if h.shouldEnqueueAgentTask(r.Context(), issue) {
 				h.TaskService.EnqueueTaskForIssue(r.Context(), issue)
 			}
-			if h.shouldEnqueueSquadLeaderOnAssign(r.Context(), issue) {
+			if h.shouldEnqueueSquadLeaderOnAssign(r.Context(), issue, actorType, actorID) {
 				h.enqueueSquadLeaderTask(r.Context(), issue, pgtype.UUID{}, actorType, actorID)
 			}
 		}
