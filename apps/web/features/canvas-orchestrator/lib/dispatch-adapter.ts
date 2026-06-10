@@ -143,3 +143,84 @@ const TERMINAL: ReadonlySet<CircuitStatus> = new Set<CircuitStatus>([
 export function isTerminal(status: CircuitStatus): boolean {
   return TERMINAL.has(status);
 }
+
+// --- wave runner (fail-closed) ---------------------------------------------
+//
+// Dispatch each topological wave in order, gating wave N+1 on wave N. The
+// control flow is fail-closed: if ANY node in a wave cannot be enqueued — the
+// `dispatchNode` callback rejects, or resolves `null` because no agent could be
+// resolved — the wave is a failure and NO further wave is dispatched. This is
+// what keeps the multica task queue consistent with the DAG: a downstream node
+// must never create a real issue/task while an upstream node it depends on
+// failed to enqueue.
+//
+// Pure control flow: the React layer injects the side-effecting closures
+// (`dispatchNode` owns the api call + status/log writes; `waitForWaveTerminal`
+// polls the WS-driven status mirror), so this is unit-testable without a DOM.
+export interface WaveRunnerDeps {
+  // Enqueue one node. Resolve with the created task id => the node is now live
+  // and will be observed via WS. Resolve `null` => the node could not be
+  // dispatched (e.g. no matching agent) and the wave fails closed. Reject =>
+  // enqueue failed and the wave fails closed.
+  dispatchNode: (node: LineNode) => Promise<string | null>;
+  // Resolve true once every live node reached a terminal status; false on
+  // timeout or cancellation.
+  waitForWaveTerminal: (liveNodeIds: string[]) => Promise<boolean>;
+  // Did a node settle in the "failed" terminal state (via WS)?
+  isNodeFailed: (nodeId: string) => boolean;
+  log: (message: string) => void;
+  isCancelled: () => boolean;
+}
+
+export async function runWaves(
+  waves: readonly (readonly LineNode[])[],
+  deps: WaveRunnerDeps,
+): Promise<void> {
+  for (let w = 0; w < waves.length; w += 1) {
+    if (deps.isCancelled()) {
+      deps.log("⏹ 已停止");
+      return;
+    }
+    const wave = waves[w]!;
+    deps.log(`层 ${w + 1}/${waves.length}: 派发 ${wave.length} 个节点`);
+
+    const liveNodeIds: string[] = [];
+    let dispatchFailed = false;
+    for (const node of wave) {
+      try {
+        const taskId = await deps.dispatchNode(node);
+        if (taskId == null) {
+          // Node could not be dispatched (no agent) — fail closed and stop
+          // enqueuing the rest of this wave.
+          dispatchFailed = true;
+          break;
+        }
+        liveNodeIds.push(node.id);
+      } catch {
+        // Enqueue rejected. The node status/log was already written by the
+        // dispatchNode closure; here we just stop the wave from continuing.
+        dispatchFailed = true;
+        break;
+      }
+    }
+
+    if (dispatchFailed) {
+      deps.log(`层 ${w + 1} 入队失败，停止后续层`);
+      return;
+    }
+
+    const ok = await deps.waitForWaveTerminal(liveNodeIds);
+    if (deps.isCancelled()) {
+      deps.log("⏹ 已停止");
+      return;
+    }
+    const failed = liveNodeIds.filter((id) => deps.isNodeFailed(id));
+    if (!ok || failed.length > 0) {
+      deps.log(
+        `层 ${w + 1} 未全部通过${failed.length ? `（失败: ${failed.join(", ")}）` : "（超时）"}，停止后续层`,
+      );
+      return;
+    }
+    deps.log(`层 ${w + 1} 全部完成 ✓`);
+  }
+}

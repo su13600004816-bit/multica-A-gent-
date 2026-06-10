@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Agent } from "@multica/core/types";
 
 import {
@@ -6,6 +6,7 @@ import {
   compileNodeToQueueRequest,
   isTerminal,
   resolveAgentForExecutor,
+  runWaves,
   taskStatusToCircuit,
   wsEventToCircuit,
 } from "../dispatch-adapter";
@@ -127,5 +128,147 @@ describe("isTerminal", () => {
     expect(isTerminal("neutral")).toBe(true);
     expect(isTerminal("running")).toBe(false);
     expect(isTerminal("pending")).toBe(false);
+  });
+});
+
+describe("runWaves (fail-closed wave gating)", () => {
+  function node(id: string): LineNode {
+    return {
+      id,
+      kind: "dev",
+      executor: "claude",
+      role: "dev",
+      mode: "write",
+      instruction: `run ${id}`,
+      ownedPaths: [`src/${id}.ts`],
+    };
+  }
+
+  // Build a dispatchNode closure that mirrors the component: it calls
+  // quickCreateIssue per node, resolving with the task id or rejecting on
+  // enqueue failure. The spy lets a test assert exactly which nodes reached
+  // the queue.
+  function makeDispatch(quickCreateIssue: (nodeId: string) => Promise<string>) {
+    return async (n: LineNode): Promise<string | null> => quickCreateIssue(n.id);
+  }
+
+  it("does NOT dispatch the second wave when a first-wave node fails to enqueue", async () => {
+    const quickCreateIssue = vi.fn(async (nodeId: string) => {
+      if (nodeId === "w1") throw new Error("queue rejected");
+      return `task-${nodeId}`;
+    });
+
+    await runWaves([[node("w1")], [node("w2")]], {
+      dispatchNode: makeDispatch(quickCreateIssue),
+      waitForWaveTerminal: async () => true,
+      isNodeFailed: () => false,
+      log: () => {},
+      isCancelled: () => false,
+    });
+
+    // First wave's node was attempted; the second wave never reached the queue.
+    expect(quickCreateIssue).toHaveBeenCalledTimes(1);
+    expect(quickCreateIssue).toHaveBeenCalledWith("w1");
+    expect(quickCreateIssue).not.toHaveBeenCalledWith("w2");
+  });
+
+  it("stops enqueuing the rest of a wave once one node in it fails", async () => {
+    const quickCreateIssue = vi.fn(async (nodeId: string) => {
+      if (nodeId === "a") throw new Error("queue rejected");
+      return `task-${nodeId}`;
+    });
+
+    await runWaves([[node("a"), node("b")], [node("c")]], {
+      dispatchNode: makeDispatch(quickCreateIssue),
+      waitForWaveTerminal: async () => true,
+      isNodeFailed: () => false,
+      log: () => {},
+      isCancelled: () => false,
+    });
+
+    // "a" failed → "b" (same wave) and "c" (next wave) are never enqueued.
+    expect(quickCreateIssue).toHaveBeenCalledTimes(1);
+    expect(quickCreateIssue).toHaveBeenCalledWith("a");
+  });
+
+  it("fails closed when a node cannot be dispatched (no agent → null)", async () => {
+    const quickCreateIssue = vi.fn(async (nodeId: string) => `task-${nodeId}`);
+    const dispatchNode = vi.fn(async (n: LineNode): Promise<string | null> => {
+      if (n.id === "w1") return null; // no agent resolved
+      return quickCreateIssue(n.id);
+    });
+
+    await runWaves([[node("w1")], [node("w2")]], {
+      dispatchNode,
+      waitForWaveTerminal: async () => true,
+      isNodeFailed: () => false,
+      log: () => {},
+      isCancelled: () => false,
+    });
+
+    expect(dispatchNode).toHaveBeenCalledTimes(1);
+    expect(quickCreateIssue).not.toHaveBeenCalled();
+  });
+
+  it("dispatches every wave in order when all nodes enqueue and complete", async () => {
+    const order: string[] = [];
+    const quickCreateIssue = vi.fn(async (nodeId: string) => {
+      order.push(nodeId);
+      return `task-${nodeId}`;
+    });
+
+    await runWaves([[node("w1")], [node("w2")], [node("w3")]], {
+      dispatchNode: makeDispatch(quickCreateIssue),
+      waitForWaveTerminal: async () => true,
+      isNodeFailed: () => false,
+      log: () => {},
+      isCancelled: () => false,
+    });
+
+    expect(order).toEqual(["w1", "w2", "w3"]);
+  });
+
+  it("does NOT advance when a dispatched node settles failed via WS", async () => {
+    const quickCreateIssue = vi.fn(async (nodeId: string) => `task-${nodeId}`);
+
+    await runWaves([[node("w1")], [node("w2")]], {
+      dispatchNode: makeDispatch(quickCreateIssue),
+      waitForWaveTerminal: async () => true,
+      isNodeFailed: (id) => id === "w1",
+      log: () => {},
+      isCancelled: () => false,
+    });
+
+    expect(quickCreateIssue).toHaveBeenCalledTimes(1);
+    expect(quickCreateIssue).not.toHaveBeenCalledWith("w2");
+  });
+
+  it("does NOT advance when a wave times out before reaching terminal", async () => {
+    const quickCreateIssue = vi.fn(async (nodeId: string) => `task-${nodeId}`);
+
+    await runWaves([[node("w1")], [node("w2")]], {
+      dispatchNode: makeDispatch(quickCreateIssue),
+      waitForWaveTerminal: async () => false, // timeout / cancel
+      isNodeFailed: () => false,
+      log: () => {},
+      isCancelled: () => false,
+    });
+
+    expect(quickCreateIssue).toHaveBeenCalledTimes(1);
+    expect(quickCreateIssue).not.toHaveBeenCalledWith("w2");
+  });
+
+  it("stops before dispatching when cancelled", async () => {
+    const quickCreateIssue = vi.fn(async (nodeId: string) => `task-${nodeId}`);
+
+    await runWaves([[node("w1")]], {
+      dispatchNode: makeDispatch(quickCreateIssue),
+      waitForWaveTerminal: async () => true,
+      isNodeFailed: () => false,
+      log: () => {},
+      isCancelled: () => true,
+    });
+
+    expect(quickCreateIssue).not.toHaveBeenCalled();
   });
 });

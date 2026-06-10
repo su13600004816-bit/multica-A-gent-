@@ -56,6 +56,7 @@ import {
   isTerminal,
   resolveAgentForExecutor,
   resolveExternalTaskId,
+  runWaves,
   wsEventToCircuit,
 } from "../lib/dispatch-adapter";
 import {
@@ -322,47 +323,40 @@ function CanvasOrchestratorInner() {
     setStatusById({});
     pushLog(`▶ 开始执行「${line.title}」(${line.nodes.length} 节点)`);
 
+    // Enqueue one node onto the multica task queue. Resolves with the task id
+    // (node is now live), resolves null when no agent can be resolved, or
+    // rejects when quickCreateIssue fails — runWaves fails the wave closed in
+    // the latter two cases so no downstream wave is dispatched.
+    const dispatchNode = async (node: LineNode): Promise<string | null> => {
+      const agent = resolveAgentForExecutor(node.executor, agents);
+      if (!agent) {
+        setStatus(node.id, "failed");
+        pushLog(`  ✗ ${node.id}: 找不到匹配的 agent`);
+        return null;
+      }
+      const req = compileNodeToQueueRequest(node, line.id, line.title, agent.id);
+      try {
+        const { task_id } = await api.quickCreateIssue(req);
+        taskToNode.current.set(task_id, node.id);
+        setStatus(node.id, "pending");
+        pushLog(`  ${node.id} → task ${task_id.slice(0, 8)} @ ${agent.name} (${resolveExternalTaskId(node, line.id)})`);
+        return task_id;
+      } catch (err) {
+        setStatus(node.id, "failed");
+        pushLog(`  ✗ ${node.id} 入队失败: ${(err as Error).message}`);
+        throw err;
+      }
+    };
+
     const waves = compileToWaves(line);
     try {
-      for (let w = 0; w < waves.length; w += 1) {
-        if (cancelRef.current) {
-          pushLog("⏹ 已停止");
-          break;
-        }
-        const wave = waves[w]!;
-        pushLog(`层 ${w + 1}/${waves.length}: 派发 ${wave.length} 个节点`);
-        const waveNodeIds: string[] = [];
-        for (const node of wave) {
-          const agent = resolveAgentForExecutor(node.executor, agents);
-          if (!agent) {
-            pushLog(`  ✗ ${node.id}: 找不到匹配的 agent`);
-            continue;
-          }
-          const req = compileNodeToQueueRequest(node, line.id, line.title, agent.id);
-          try {
-            const { task_id } = await api.quickCreateIssue(req);
-            taskToNode.current.set(task_id, node.id);
-            setStatus(node.id, "pending");
-            waveNodeIds.push(node.id);
-            pushLog(`  ${node.id} → task ${task_id.slice(0, 8)} @ ${agent.name} (${resolveExternalTaskId(node, line.id)})`);
-          } catch (err) {
-            setStatus(node.id, "failed");
-            pushLog(`  ✗ ${node.id} 入队失败: ${(err as Error).message}`);
-          }
-        }
-
-        const ok = await waitForWaveTerminal(waveNodeIds);
-        if (cancelRef.current) {
-          pushLog("⏹ 已停止");
-          break;
-        }
-        const failed = waveNodeIds.filter((id) => statusRef.current[id] === "failed");
-        if (!ok || failed.length > 0) {
-          pushLog(`层 ${w + 1} 未全部通过${failed.length ? `（失败: ${failed.join(", ")}）` : "（超时）"}，停止后续层`);
-          break;
-        }
-        pushLog(`层 ${w + 1} 全部完成 ✓`);
-      }
+      await runWaves(waves, {
+        dispatchNode,
+        waitForWaveTerminal,
+        isNodeFailed: (id) => statusRef.current[id] === "failed",
+        log: pushLog,
+        isCancelled: () => cancelRef.current,
+      });
     } finally {
       setRunning(false);
       pushLog("执行结束");
