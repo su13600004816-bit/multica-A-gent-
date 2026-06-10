@@ -1109,12 +1109,26 @@ func shouldInheritParentMentions(parentComment *db.Comment, replyMentions []util
 // dedupe and the natural queued/dispatched coalescing of the task queue.
 // Note: no status gate here — @mention is an explicit action and should work
 // even on done/cancelled issues (the agent can reopen the issue if needed).
+//
+// Anti-loop exception for squad-owned issues: when an agent that belongs to
+// the squad owning this issue authors a comment, its individual @agent
+// mentions do NOT enqueue personal agent runs. In-squad dispatch must go
+// through squad assignment / the leader (the @squad path and
+// shouldEnqueueSquadLeaderOnComment), never personal mentions — a squad
+// leader @mentioning a worker/auditor agent otherwise creates a
+// leader→@agent→run→leader feedback loop that re-routes endlessly and lets a
+// fresh run overwrite an already-recorded PASS. The @squad mention path is
+// left intact (it is the sanctioned routing), and member→agent mentions plus
+// agent→agent delegation on non-squad (personal) issues are unaffected.
 func (h *Handler) enqueueMentionedAgentTasks(ctx context.Context, issue db.Issue, comment db.Comment, parentComment *db.Comment, authorType, authorID string) {
 	wsID := uuidToString(issue.WorkspaceID)
 	mentions := util.ParseMentions(comment.Content)
 	if shouldInheritParentMentions(parentComment, mentions, authorType) {
 		mentions = util.ParseMentions(parentComment.Content)
 	}
+	// Computed once: in-squad agent authors cannot dispatch via personal
+	// @agent mentions on this squad's own issue (see the anti-loop note above).
+	suppressInSquadAgentMention := h.inSquadAgentMentionSuppressed(ctx, issue, authorType, authorID)
 	for _, m := range mentions {
 		if m.Type == "squad" {
 			// @squad mention → trigger the squad's leader agent.
@@ -1155,12 +1169,33 @@ func (h *Handler) enqueueMentionedAgentTasks(ctx context.Context, issue db.Issue
 			if err != nil || hasPending {
 				continue
 			}
+			// Single-execution lock: this comment must not enqueue more than one
+			// leader run, even after a prior one completed or the comment is
+			// re-routed onto. Breaks the same-PASS-comment re-trigger storm.
+			hasTriggered, err := h.Queries.HasTaskForTriggerCommentAndAgent(ctx, db.HasTaskForTriggerCommentAndAgentParams{
+				TriggerCommentID: comment.ID,
+				AgentID:          leaderID,
+			})
+			if err != nil || hasTriggered {
+				continue
+			}
 			if _, err := h.TaskService.EnqueueTaskForSquadLeader(ctx, issue, leaderID, comment.ID); err != nil {
 				slog.Warn("enqueue squad leader mention task failed", "issue_id", uuidToString(issue.ID), "squad_id", m.ID, "error", err)
 			}
 			continue
 		}
 		if m.Type != "agent" {
+			continue
+		}
+		// Anti-loop: an in-squad agent must not spawn a personal agent run via
+		// a direct @agent mention on its own squad's issue. The mention still
+		// renders as a link; it simply does not enqueue a task. Squad-internal
+		// dispatch goes through assignment / the leader instead.
+		if suppressInSquadAgentMention {
+			slog.Info("suppressed in-squad personal @agent mention dispatch",
+				"issue_id", uuidToString(issue.ID),
+				"author_id", authorID,
+				"mentioned_agent", m.ID)
 			continue
 		}
 		agentUUID := parseUUID(m.ID)
@@ -1190,12 +1225,61 @@ func (h *Handler) enqueueMentionedAgentTasks(ctx context.Context, issue db.Issue
 		if err != nil || hasPending {
 			continue
 		}
+		// Single-execution lock: this comment must not enqueue more than one run
+		// for this agent, even after a prior one completed or the comment is
+		// edited and re-enters the trigger path. Breaks the same-comment
+		// re-trigger storm.
+		hasTriggered, err := h.Queries.HasTaskForTriggerCommentAndAgent(ctx, db.HasTaskForTriggerCommentAndAgentParams{
+			TriggerCommentID: comment.ID,
+			AgentID:          agentUUID,
+		})
+		if err != nil || hasTriggered {
+			continue
+		}
 		// Always use the current comment as the trigger so the agent reads the
 		// actual reply that mentioned it, not the thread root.
 		if _, err := h.TaskService.EnqueueTaskForMention(ctx, issue, agentUUID, comment.ID); err != nil {
 			slog.Warn("enqueue mention agent task failed", "issue_id", uuidToString(issue.ID), "agent_id", m.ID, "error", err)
 		}
 	}
+}
+
+// inSquadAgentMentionSuppressed reports whether individual @agent mentions in
+// an agent-authored comment must be prevented from enqueuing personal agent
+// runs. It is true only when ALL of the following hold:
+//   - the comment author is an agent,
+//   - the issue is owned by a squad (assignee_type == "squad"),
+//   - that author agent is a member of the owning squad (the squad leader is
+//     registered as a "leader"-role member, so this also covers the leader).
+//
+// When true, squad-internal work must be dispatched through squad assignment
+// or the leader, not personal mentions — this is the structural break for the
+// leader→@agent→run→leader loop. The check is deliberately narrow: it never
+// touches member-authored comments, non-squad issues, or agents outside the
+// owning squad, so legitimate human routing and cross-issue agent delegation
+// keep working. Fails open (returns false) on any error so a transient DB
+// hiccup degrades to the prior behavior rather than silently dropping a
+// legitimate mention.
+func (h *Handler) inSquadAgentMentionSuppressed(ctx context.Context, issue db.Issue, authorType, authorID string) bool {
+	if authorType != "agent" {
+		return false
+	}
+	if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+		return false
+	}
+	authorUUID, err := util.ParseUUID(authorID)
+	if err != nil {
+		return false
+	}
+	isMember, err := h.Queries.IsSquadMember(ctx, db.IsSquadMemberParams{
+		SquadID:    issue.AssigneeID,
+		MemberType: "agent",
+		MemberID:   authorUUID,
+	})
+	if err != nil {
+		return false
+	}
+	return isMember
 }
 
 func (h *Handler) UpdateComment(w http.ResponseWriter, r *http.Request) {
