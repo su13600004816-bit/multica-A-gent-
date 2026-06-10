@@ -18,9 +18,53 @@ FAIL — i.e. *draw → compile → dispatch → observe → self-heal*.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **1 — compiler core** | Port the backend-independent IR + compiler (`line-ir.ts`) and its status enum; unit-test `compileToWaves` / `validateLine` / rework helpers. | **done (this PR)** |
-| **2 — canvas UI + dispatch/observe** | Port the xyflow + dagre canvas (draw/connect/auto-layout/undo-redo) against multica's design system; rewrite dispatch/observe onto the **multica task queue + WS** (NOT old-station `agent-control` polling). | sub-issue |
+| **1 — compiler core** | Port the backend-independent IR + compiler (`line-ir.ts`) and its status enum; unit-test `compileToWaves` / `validateLine` / rework helpers. | **done (PR #13)** |
+| **2 — canvas UI + dispatch/observe** | Port the xyflow + dagre canvas (draw/connect/auto-layout/undo-redo) against multica's design system; rewrite dispatch/observe onto the **multica task queue + WS** (NOT old-station `agent-control` polling). | **done (this PR)** |
 | **3 — persistence + autonomous rework** | Persist runs/layout to multica **DB** (issue/task linked) instead of local JSON; wire `reworkAudit` into multica's trigger system, coordinating boundaries with the watchdog↔line-brain conflict fix (PL-156). | sub-issue |
+
+## What landed in phase 2
+
+The canvas UI and a **multica-native** dispatch/observe layer — no legacy
+agent-control transport, no DB persistence / autonomous rework (those stay
+phase 3).
+
+- `lib/rf-mapping.ts` — ProductionLine ⇄ `@xyflow/react` node/edge mapping,
+  `dagre` left-to-right auto-layout, add/connect/remove helpers, and the T01
+  reference preset. Pure (no React) so it unit-tests directly.
+- `lib/dispatch-adapter.ts` — the transport rewrite. `compileNodeToQueueRequest`
+  projects a node onto a `quickCreateIssue` payload (one queue row per node),
+  `resolveAgentForExecutor` maps `claude`/`codex` → a workspace agent by
+  model/name, and `wsEventToCircuit` / `taskStatusToCircuit` colour nodes from
+  the `task:*` WebSocket lifecycle (enum drift downgrades, never throws).
+- `lib/canvas-history.ts` — pure past/present/future undo/redo (cap 50).
+- `components/circuit-node.tsx` — presentational xyflow node; status colour
+  arrives via props from the WS-fed store, **no embedded fetch** (decoupling
+  point 2 below). Colours use semantic tokens (`success`/`warning`/`info`/
+  `destructive`).
+- `components/node-inspector.tsx` — edit a node's executor/mode/instruction/
+  ownedPaths; every change commits to undo history.
+- `components/canvas-orchestrator.tsx` — the page: ReactFlow canvas + toolbar
+  (add dev/audit, auto-layout, undo/redo, delete, T01 preset, clear, execute/
+  stop) + inspector + execution log. `execute()` validates, compiles waves,
+  and dispatches each wave sequentially onto the multica task queue, gating
+  wave N+1 on wave N reaching a terminal status over WS.
+- Route: `apps/web/app/[workspaceSlug]/(dashboard)/canvas-orchestrator/page.tsx`.
+- Tests: `rf-mapping.test.ts`, `dispatch-adapter.test.ts`, `canvas-history.test.ts`
+  (29 new; 53 total in this feature).
+
+**Scope/decisions for phase 2 reviewers**
+
+- The feature lives in `apps/web/features/canvas-orchestrator/` (continuing
+  phase 1's location). It is web-only today; if desktop ever needs it the UI
+  should be promoted to `packages/views/` per the monorepo sharing rules.
+- A sidebar nav entry is intentionally **not** wired yet — the page is reachable
+  at `/{workspace}/canvas-orchestrator`. Adding a nav link touches the shared
+  `NavKey`/`paths`/i18n surface and is deferred to keep this PR's blast radius
+  on the feature itself.
+- `execute()` creates **real** quick-create issues/tasks (that is the queue
+  evidence), guarded by a confirm dialog. There is no autonomous rework loop —
+  audit nodes simply colour by completion; verdict parsing / re-dispatch is
+  phase 3.
 
 ## What landed in phase 1
 
