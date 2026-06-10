@@ -10,6 +10,9 @@
 - `line_partial.py` —— PARTIAL 项的纯函数库(被上面热路径 import 消费,不再是旁路)。
 - `line_done_gate.py` —— X32:收口门禁第 6 条 `evidence_fresh`(旧 PASS 新鲜度失效)。
 - `line_evidence.py` —— X32/X51 依赖(`evidence_is_stale` / `verify_github_refs` 等)。
+- `line_bridge.py` —— X20/BOM-4 门禁桥:`gate()` 在调任何模型前对空证据 / 页面任务无 URL+截图
+  **直接判 FAIL**(`line_bridge.py:107-112`,离线确定性,回归 `[10] BOM-4` 依赖此文件);
+  无专属 API URL 即拒非专属路由(`line_bridge.py:122-124,154-156`,X20 脚本策略层证据)。
 - `tests/test_pl140_partial.py`(33 条)+ `tests/test_line_mechanism.py`(143 条,含
   emit_observability 现役路径,跑出 `CROSS_VALIDATE_OK` / `MEMBER_STATS` / `STATUS_SIGNED`)。
 - `systemd/line-watchdog-heartbeat.{service,timer}` + `install.sh` —— X63 进程外心跳 watcher(待 ops 安装)。
@@ -48,6 +51,9 @@ WATCHDOG_DRY_RUN=1 WATCHDOG_NOW="2026-06-10T01:00:00Z" WATCHDOG_FIXTURE="$D/issu
 
 # 1) 单测(33 条,连跑 3 次全绿)
 python3 -m unittest tests.test_pl140_partial
+
+# 1b) 全量回归(自包含:LEADER_AUDIT/ledger 均落临时目录,任意只读 checkout 下离线可复现)
+bash tests/run_regression.sh   # → ==== 回归汇总:PASS=92 FAIL=0 ====  ALL GREEN
 
 # 2) X32 端到端:PASS 之后又出现 failed run → 旧 PASS 失效 → BLOCK(exit 2)
 D=$(mktemp -d)

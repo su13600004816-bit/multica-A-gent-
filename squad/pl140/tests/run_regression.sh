@@ -17,6 +17,9 @@ export WATCHDOG_FIXTURE=$T/pl89_issues.json
 export WATCHDOG_RUNS_FIXTURE=$T/pl89_runs.json
 export WATCHDOG_COMMENTS_FIXTURE=$T/pl89_comments.json
 export WATCHDOG_LEDGER_DIR=$REG_TMP/ledger  # U30:ledger 落盘到临时目录,不污染仓库
+# PL-140:leader_audit 默认写 /home/fleet/line-config/leader_audit.jsonl,审计 checkout 下该路径只读,
+# 会让 --route 用例误判失败。改写到临时目录,使回归在任意只读 checkout 下都可复现。
+export WATCHDOG_LEADER_AUDIT_F=$REG_TMP/leader_audit.jsonl
 # PL-137:离线回归默认指向不存在的停用标志,隔离生产 watchdog.disabled,
 # 否则停用期跑回归会误把 --post 用例判失败(停用=真只读)。需要测停用的用例自行覆盖该变量。
 export WATCHDOG_DISABLE_FLAG=$REG_TMP/no_such_disable_flag.disabled
@@ -70,8 +73,11 @@ echo "[9] BOM-6 line_reset 证据不全必须中止"
 DONE_GATE_COMMENTS_FIXTURE=$T/pl89_done_block_comments.json python3 line_reset.py PL-89 --no-archive >/dev/null 2>&1
 [ $? -eq 2 ] && ok "line_reset ABORTED(exit 2)" || no "line_reset 未中止"
 
-echo "[10] BOM-4 门禁无截图/URL 证据直接 FAIL"
-python3 line_bridge.py gate iid --goal g --evidence "build 通过" 2>&1 | grep -q "VERDICT: FAIL" && ok "空证据判 FAIL" || no "空证据未判 FAIL"
+echo "[10] BOM-4 门禁无截图/URL 证据直接 FAIL(离线确定性路径,不调模型)"
+# 空证据 → gate() 在调任何模型前直接 FAIL(line_bridge.py:107-109),离线可复现。
+python3 line_bridge.py gate iid --goal g --evidence "" 2>&1 | grep -q "VERDICT: FAIL" && ok "空证据判 FAIL" || no "空证据未判 FAIL"
+# 页面任务无 URL/截图 → 同样在调模型前直接 FAIL(line_bridge.py:110-112)。
+python3 line_bridge.py gate iid --goal "画布页面入口" --evidence "已完成开发" 2>&1 | grep -q "VERDICT: FAIL" && ok "页面任务无URL/截图判 FAIL" || no "页面无URL/截图未判 FAIL"
 
 echo "[11] BOM-7 line_dispatch 告警台不再指向失效旧台号"
 grep -Eq '^HANDOFF *= *"199691f5' line_dispatch.py && no "HANDOFF 仍指向失效 199691f5" || ok "HANDOFF 已改为 PL-94 bc056ade"
