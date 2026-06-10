@@ -32,32 +32,45 @@ var (
 	ErrCLIVersionTooOld  = errors.New("multica CLI version is below required minimum")
 )
 
-// devDescribeRe matches the `git describe --tags --always --dirty` output for
-// a build past the latest tag, e.g. `v0.2.15-235-gdaf0e935` (optionally with a
-// trailing `-dirty`). Daemons built from source (Makefile `make build` / `make
-// daemon`) report this shape; tagged releases are bare semver. Treating dev-
-// described daemons as OK keeps `make daemon` unblocked without weakening the
-// gate for staging or production users running stale stable releases.
-var devDescribeRe = regexp.MustCompile(`^v?\d+\.\d+\.\d+-\d+-g[0-9a-fA-F]+`)
+// releaseVersionRe matches a clean published release: bare semver, optionally
+// v-prefixed, with nothing trailing — e.g. `0.2.20` or `v1.3.0`. Anything that
+// does NOT match is a dev / HEAD / source build: a bare `dev` (the ldflags
+// fallback in cmd/server/main.go and cmd/multica/main.go when `git describe`
+// is unavailable), a git-describe string like `v0.2.15-235-gdaf0e935`, or a
+// `-dirty` working tree. Those builds are at or ahead of HEAD by construction,
+// so they are never "below" a released threshold.
+var releaseVersionRe = regexp.MustCompile(`^v?\d+\.\d+\.\d+$`)
 
-// CheckMinCLIVersion returns nil when `detected` parses as ≥ minimum. Returns
-// ErrCLIVersionMissing for empty or unparsable input, and ErrCLIVersionTooOld
-// when parsable but below the minimum. The caller can check for these
-// sentinel errors with errors.Is to drive the response shape.
+// isReleaseVersion reports whether detected is a clean published release that
+// can be ranked numerically against the minimum. Non-matches are dev/source
+// builds, which are exempt from the gate.
+func isReleaseVersion(detected string) bool {
+	return releaseVersionRe.MatchString(strings.TrimSpace(detected))
+}
+
+// CheckMinCLIVersion returns nil when `detected` satisfies the minimum. It
+// returns ErrCLIVersionMissing only when no version is reported at all (empty
+// string), and ErrCLIVersionTooOld for a published release strictly below the
+// minimum. The caller can check for these sentinel errors with errors.Is to
+// drive the response shape.
 //
-// Dev-built daemons (git-describe shape) always pass — the version string
-// itself is the shared signal, so the modal pre-check and this server gate
-// agree by construction without needing to compare separate env flags.
+// Dev / HEAD / source builds (anything that is not a clean X.Y.Z release, per
+// isReleaseVersion) always pass: they are at or ahead of HEAD by construction,
+// so treating them as below a released threshold would wrongly lock out the
+// production daemon, which reports cli_version="dev". Only genuine published
+// releases are ranked numerically against the minimum.
 func CheckMinCLIVersion(detected string) error {
 	d := strings.TrimSpace(detected)
 	if d == "" {
 		return ErrCLIVersionMissing
 	}
-	if devDescribeRe.MatchString(d) {
+	if !isReleaseVersion(d) {
 		return nil
 	}
 	parsed, err := parseSemver(d)
 	if err != nil {
+		// isReleaseVersion already validated the X.Y.Z shape, so a parse
+		// failure here is an internal inconsistency. Fail closed.
 		return ErrCLIVersionMissing
 	}
 	min, err := parseSemver(MinQuickCreateCLIVersion)
