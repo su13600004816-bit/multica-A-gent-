@@ -7,12 +7,20 @@ import { agentListOptions, memberListOptions, squadListOptions } from "@multica/
 import { resolvePublicFileUrl } from "@multica/core/workspace/avatar-url";
 import { useAuthStore } from "@multica/core/auth";
 import { useSquadsViewStore } from "@multica/core/squads/stores";
-import { AppLink } from "../../navigation";
+import { AppLink, useNavigation } from "../../navigation";
 import { PageHeader } from "../../layout/page-header";
-import { Users, Plus, Search, Bot, User } from "lucide-react";
+import { Users, Plus, Search, Bot, User, Network } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@multica/ui/components/ui/dialog";
 import { ActorAvatar as ActorAvatarBase } from "@multica/ui/components/common/actor-avatar";
 import { useModalStore } from "@multica/core/modals";
 import type { Agent, Squad } from "@multica/core/types";
@@ -26,6 +34,7 @@ export function SquadsPage() {
   const workspace = useCurrentWorkspace();
   const wsId = workspace?.id ?? "";
   const p = useWorkspacePaths();
+  const { push } = useNavigation();
   const currentUser = useAuthStore((s) => s.user);
   const { data: squads = [], isLoading } = useQuery({
     ...squadListOptions(wsId),
@@ -49,6 +58,7 @@ export function SquadsPage() {
   const scope = useSquadsViewStore((s) => s.scope);
   const setScope = useSquadsViewStore((s) => s.setScope);
   const [search, setSearch] = useState("");
+  const [showNewCanvas, setShowNewCanvas] = useState(false);
 
   const scopeCounts = useMemo(() => {
     let mine = 0;
@@ -77,10 +87,16 @@ export function SquadsPage() {
             <span className="text-xs text-muted-foreground tabular-nums">{squads.length}</span>
           )}
         </div>
-        <Button size="sm" variant="outline" onClick={() => useModalStore.getState().open("create-squad")}>
-          <Plus className="size-3.5 mr-1.5" />
-          {t(($) => $.page.new_button)}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowNewCanvas(true)}>
+            <Network className="size-3.5 mr-1.5" />
+            {t(($) => $.page.new_canvas_button)}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => useModalStore.getState().open("create-squad")}>
+            <Plus className="size-3.5 mr-1.5" />
+            {t(($) => $.page.new_button)}
+          </Button>
+        </div>
       </PageHeader>
 
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
@@ -115,9 +131,16 @@ export function SquadsPage() {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-4">
+                {/* Two-column paired layout (PL-111): each squad card sits next to
+                    its own canvas card. The canvas card opens the squad's
+                    orchestration page (/<ws>/canvas/<squadId>); the squad card
+                    keeps opening the squad detail page. Stacks on narrow screens. */}
                 <div className="grid gap-3">
                   {filtered.map((squad) => (
-                    <SquadCard key={squad.id} squad={squad} leader={agentsById.get(squad.leader_id)} creator={membersByUserId.get(squad.creator_id)} href={p.squadDetail(squad.id)} />
+                    <div key={squad.id} className="grid gap-3 lg:grid-cols-2">
+                      <SquadCard squad={squad} leader={agentsById.get(squad.leader_id)} creator={membersByUserId.get(squad.creator_id)} href={p.squadDetail(squad.id)} />
+                      <CanvasCard squad={squad} href={p.squadCanvas(squad.id)} />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -125,7 +148,114 @@ export function SquadsPage() {
           </>
         )}
       </div>
+
+      {showNewCanvas && (
+        <NewCanvasDialog
+          squads={squads}
+          onClose={() => setShowNewCanvas(false)}
+          onPick={(squadId) => {
+            setShowNewCanvas(false);
+            // Each squad owns one canvas; open its independent detail page.
+            // Backend canvas persistence is a later increment — this is the
+            // interaction skeleton (button → squad picker → canvas detail page).
+            push(p.squadCanvas(squadId));
+          }}
+          onCreateSquad={() => {
+            setShowNewCanvas(false);
+            useModalStore.getState().open("create-squad");
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// "New Canvas" entry point. A canvas is a squad-level resource (one per squad),
+// so this picks which squad's canvas to open rather than creating a free-
+// floating board. Mirrors the compact picker dialogs used elsewhere; all
+// chrome is Multica design-system tokens.
+function NewCanvasDialog({
+  squads,
+  onClose,
+  onPick,
+  onCreateSquad,
+}: {
+  squads: Squad[];
+  onClose: () => void;
+  onPick: (squadId: string) => void;
+  onCreateSquad: () => void;
+}) {
+  const { t } = useT("squads");
+  const [filter, setFilter] = useState("");
+  const q = filter.trim().toLowerCase();
+  const filtered = squads.filter(
+    (s) => !q || s.name.toLowerCase().includes(q) || matchesPinyin(s.name, q),
+  );
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t(($) => $.new_canvas_dialog.title)}</DialogTitle>
+          <DialogDescription>{t(($) => $.new_canvas_dialog.description)}</DialogDescription>
+        </DialogHeader>
+
+        {squads.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <Network className="size-9 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">{t(($) => $.new_canvas_dialog.empty)}</p>
+            <Button size="sm" variant="outline" onClick={onCreateSquad}>
+              <Plus className="size-3.5 mr-1.5" />
+              {t(($) => $.page.new_button)}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3 min-w-0">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                autoFocus
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder={t(($) => $.new_canvas_dialog.search_placeholder)}
+                className="h-8 w-full pl-8 text-sm"
+              />
+            </div>
+            <div className="-mx-1 max-h-72 overflow-y-auto px-1">
+              {filtered.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {t(($) => $.page.empty_no_match)}
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {filtered.map((squad) => (
+                    <button
+                      key={squad.id}
+                      type="button"
+                      onClick={() => onPick(squad.id)}
+                      className="flex w-full items-center gap-3 rounded-lg border p-2.5 text-left transition-colors hover:bg-accent/50"
+                    >
+                      <SquadAvatar squad={squad} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{squad.name}</p>
+                        {squad.description && (
+                          <p className="truncate text-xs text-muted-foreground">{squad.description}</p>
+                        )}
+                      </div>
+                      <Network className="size-3.5 shrink-0 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>{t(($) => $.new_canvas_dialog.cancel)}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -156,6 +286,28 @@ function SquadCard({ squad, leader, creator, href }: { squad: Squad; leader?: Ag
           )}
         </div>
       </div>
+    </AppLink>
+  );
+}
+
+// Canvas card — the right half of each paired row (PL-111). Visually a sibling
+// of SquadCard (same rounded-lg border / hover-accent chrome), but it carries
+// the squad's avatar + "<name> 画布" and opens the squad's orchestration page.
+function CanvasCard({ squad, href }: { squad: Squad; href: string }) {
+  const { t } = useT("squads");
+  return (
+    <AppLink
+      href={href}
+      className="group flex items-center gap-3 sm:gap-4 rounded-lg border p-3 sm:p-4 hover:bg-accent/50 transition-colors w-full overflow-hidden"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Network className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <p className="font-medium truncate">{t(($) => $.canvas_page.card_title, { name: squad.name })}</p>
+        <p className="text-sm text-muted-foreground truncate mt-0.5">{t(($) => $.canvas_page.card_hint)}</p>
+      </div>
+      <Network className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
     </AppLink>
   );
 }
@@ -196,12 +348,16 @@ function SquadsListSkeleton() {
       <div className="flex-1 overflow-y-auto p-4">
         <div className="grid gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 sm:gap-4 rounded-lg border p-3 sm:p-4">
-              <Skeleton className="h-9 w-9 shrink-0 rounded-md" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-1/3 rounded" />
-                <Skeleton className="h-3 w-2/3 rounded" />
-              </div>
+            <div key={i} className="grid gap-3 lg:grid-cols-2">
+              {Array.from({ length: 2 }).map((_, j) => (
+                <div key={j} className="flex items-center gap-3 sm:gap-4 rounded-lg border p-3 sm:p-4">
+                  <Skeleton className="h-9 w-9 shrink-0 rounded-md" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-1/3 rounded" />
+                    <Skeleton className="h-3 w-2/3 rounded" />
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>

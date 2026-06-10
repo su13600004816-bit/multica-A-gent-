@@ -2,8 +2,44 @@
   "page": {
     "title": "Squads",
     "new_button": "New Squad",
+    "new_canvas_button": "New Canvas",
     "empty_no_squads": "No squads yet. Create one to get started.",
     "empty_no_match": "No squads match your filters."
+  },
+  "new_canvas_dialog": {
+    "title": "New Canvas",
+    "description": "Pick a squad to open its canvas. Each squad has its own canvas.",
+    "search_placeholder": "Search squads…",
+    "empty": "No squads yet. Create a squad first — it comes with its own canvas.",
+    "cancel": "Cancel"
+  },
+  "canvas_tab": {
+    "board_title": "{{name}} Canvas",
+    "root_subtitle_one": "{{count}} member",
+    "root_subtitle_other": "{{count}} members"
+  },
+  "canvas_page": {
+    "card_title": "{{name}} Canvas",
+    "card_hint": "Open the canvas workbench",
+    "breadcrumb_root": "Canvas",
+    "breadcrumb_leaf": "Canvas Workbench",
+    "squad_switcher": "Squads",
+    "members_section": "Squad Members",
+    "board_section": "Line Task Board",
+    "board_empty": "No tasks linked to this squad yet",
+    "new_node_label": "New node",
+    "toolbar_add_node": "Add node",
+    "toolbar_delete": "Delete selected",
+    "toolbar_fit": "Fit view",
+    "toolbar_reset": "Reset layout",
+    "toolbar_hint": "Drag to move · connect · double-click to rename",
+    "status_backlog": "Backlog",
+    "status_todo": "Todo",
+    "status_in_progress": "In Progress",
+    "status_in_review": "In Review",
+    "status_done": "Done",
+    "status_blocked": "Blocked",
+    "status_cancelled": "Cancelled"
   },
   "inspector": {
     "details_section": "Details",

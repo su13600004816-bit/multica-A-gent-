@@ -2,8 +2,43 @@
   "page": {
     "title": "小队",
     "new_button": "新建小队",
+    "new_canvas_button": "新建画布",
     "empty_no_squads": "还没有小队，创建一个开始吧。",
     "empty_no_match": "没有匹配筛选条件的小队。"
+  },
+  "new_canvas_dialog": {
+    "title": "新建画布",
+    "description": "选择一个小队，打开它的画布。每个小队都有自己的画布。",
+    "search_placeholder": "搜索小队…",
+    "empty": "还没有小队。先创建一个小队，它会自带画布。",
+    "cancel": "取消"
+  },
+  "canvas_tab": {
+    "board_title": "{{name}} 画布",
+    "root_subtitle_other": "{{count}} 名成员"
+  },
+  "canvas_page": {
+    "card_title": "{{name}} 画布",
+    "card_hint": "点击进入画布编排页面",
+    "breadcrumb_root": "画布",
+    "breadcrumb_leaf": "画布编排",
+    "squad_switcher": "小队",
+    "members_section": "小队成员",
+    "board_section": "小线任务看板",
+    "board_empty": "该小队暂无关联任务",
+    "new_node_label": "新节点",
+    "toolbar_add_node": "添加节点",
+    "toolbar_delete": "删除选中",
+    "toolbar_fit": "适应视图",
+    "toolbar_reset": "重置布局",
+    "toolbar_hint": "拖拽移动 · 连线 · 双击重命名",
+    "status_backlog": "待办池",
+    "status_todo": "待办",
+    "status_in_progress": "进行中",
+    "status_in_review": "评审中",
+    "status_done": "完成",
+    "status_blocked": "已阻塞",
+    "status_cancelled": "已取消"
   },
   "inspector": {
     "details_section": "详情",

@@ -2,8 +2,43 @@
   "page": {
     "title": "스쿼드",
     "new_button": "새 스쿼드",
+    "new_canvas_button": "새 캔버스",
     "empty_no_squads": "아직 스쿼드가 없습니다. 하나 만들어 시작하세요.",
     "empty_no_match": "필터와 일치하는 스쿼드가 없습니다."
+  },
+  "new_canvas_dialog": {
+    "title": "새 캔버스",
+    "description": "캔버스를 열 스쿼드를 선택하세요. 각 스쿼드에는 자체 캔버스가 있습니다.",
+    "search_placeholder": "스쿼드 검색…",
+    "empty": "아직 스쿼드가 없습니다. 먼저 스쿼드를 만드세요 — 자체 캔버스가 함께 생성됩니다.",
+    "cancel": "취소"
+  },
+  "canvas_tab": {
+    "board_title": "{{name}} 캔버스",
+    "root_subtitle_other": "멤버 {{count}}명"
+  },
+  "canvas_page": {
+    "card_title": "{{name}} 캔버스",
+    "card_hint": "캔버스 워크벤치 열기",
+    "breadcrumb_root": "캔버스",
+    "breadcrumb_leaf": "캔버스 편성",
+    "squad_switcher": "스쿼드",
+    "members_section": "스쿼드 멤버",
+    "board_section": "라인 작업 보드",
+    "board_empty": "이 스쿼드에 연결된 작업이 없습니다",
+    "new_node_label": "새 노드",
+    "toolbar_add_node": "노드 추가",
+    "toolbar_delete": "선택 삭제",
+    "toolbar_fit": "화면 맞춤",
+    "toolbar_reset": "레이아웃 초기화",
+    "toolbar_hint": "드래그 이동 · 연결 · 더블클릭으로 이름 변경",
+    "status_backlog": "백로그",
+    "status_todo": "할 일",
+    "status_in_progress": "진행 중",
+    "status_in_review": "검토 중",
+    "status_done": "완료",
+    "status_blocked": "차단됨",
+    "status_cancelled": "취소됨"
   },
   "inspector": {
     "details_section": "세부 정보",

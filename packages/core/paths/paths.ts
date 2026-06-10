@@ -30,6 +30,9 @@ function workspaceScoped(slug: string) {
     memberDetail: (id: string) => `${ws}/members/${encode(id)}`,
     squads: () => `${ws}/squads`,
     squadDetail: (id: string) => `${ws}/squads/${encode(id)}`,
+    // A canvas is a squad-level entity (one per squad) with its own detail page,
+    // keyed by the squad id. See packages/views squad-canvas-detail-page.tsx.
+    squadCanvas: (id: string) => `${ws}/canvas/${encode(id)}`,
     inbox: () => `${ws}/inbox`,
     myIssues: () => `${ws}/my-issues`,
     runtimes: () => `${ws}/runtimes`,
