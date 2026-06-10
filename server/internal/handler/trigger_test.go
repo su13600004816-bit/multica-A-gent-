@@ -365,5 +365,42 @@ func TestTriggerTasksForComment_NoteShortCircuits(t *testing.T) {
 	}
 
 	// Must not panic — the guard short-circuits before any DB access.
-	h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID)
+	h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID, false)
+}
+
+// TestTriggerTasksForComment_SuppressTriggersShortCircuits proves the
+// request-body-level suppress_triggers flag (CLI --no-trigger) skips ALL three
+// enqueue paths even for plain content that @mentions an agent (no /note
+// prefix). A nil-Queries Handler would panic in enqueueMentionedAgentTasks if
+// the suppress guard were missing, so a clean return proves the gate holds.
+func TestTriggerTasksForComment_SuppressTriggersShortCircuits(t *testing.T) {
+	h := &Handler{} // nil Queries / TaskService on purpose
+	issue := issueWithAgentAssignee()
+	comment := db.Comment{
+		Content: fmt.Sprintf("cc [@Other](mention://agent/%s) status sync", otherAgentID),
+	}
+
+	// suppress=true must short-circuit before any DB access — no panic.
+	h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID, true)
+}
+
+// TestTriggerTasksForComment_SuppressFalseReachesEnqueue is the negative
+// control: the same plain @agent comment WITHOUT suppression must reach the
+// mention enqueue path, which dereferences the nil Queries and panics. This
+// proves suppression is what stops the wake in the test above, not some other
+// short-circuit.
+func TestTriggerTasksForComment_SuppressFalseReachesEnqueue(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic: plain @agent comment with suppress=false must reach the enqueue path")
+		}
+	}()
+
+	h := &Handler{} // nil Queries / TaskService on purpose
+	issue := issueWithAgentAssignee()
+	comment := db.Comment{
+		Content: fmt.Sprintf("cc [@Other](mention://agent/%s) please run", otherAgentID),
+	}
+
+	h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID, false)
 }

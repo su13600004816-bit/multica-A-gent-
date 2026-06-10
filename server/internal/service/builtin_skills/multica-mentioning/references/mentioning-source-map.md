@@ -61,6 +61,20 @@ a pointer. Branch where verified: `feat/builtin-skills`.
 | Comment-flow call site that consults it | `server/internal/handler/comment.go:933` |
 | `@all` never enqueues a specific agent: it is neither `squad` nor `agent`, so it is skipped in the enqueue loop | `server/internal/handler/comment.go:1133` |
 
+## suppress_triggers / --no-trigger (visible but no wake)
+
+| Fact | Source |
+| --- | --- |
+| `CreateCommentRequest.SuppressTriggers` — request-body `suppress_triggers` field | `server/internal/handler/comment.go:780` |
+| Create flow passes it into the trigger chokepoint | `server/internal/handler/comment.go` (search `triggerTasksForComment(... req.SuppressTriggers)`) |
+| `triggerTasksForComment` takes a `suppressTriggers bool` and returns early at the single chokepoint, before assignee / squad-leader / `@mention` enqueue | `server/internal/handler/comment.go:957,968` |
+| Same guard also short-circuits the legacy `/note` content prefix (`isNoteComment`); suppress flag is authoritative, `/note` is the compat shortcut | `server/internal/handler/comment.go:968` |
+| Edit flow honors it too: `UpdateComment` request carries `suppress_triggers` and forwards it on the re-trigger path | `server/internal/handler/comment.go:1275` |
+| CLI flag `--no-trigger` registered on `issue comment add` | `server/cmd/multica/cmd_issue.go:355` |
+| CLI sets `body["suppress_triggers"] = true` when `--no-trigger` is passed | `server/cmd/multica/cmd_issue.go:1216` |
+| Server skip-trigger test (suppress=true short-circuits before DB; suppress=false reaches enqueue and panics on nil Queries) | `server/internal/handler/trigger_test.go` (search `SuppressTriggersShortCircuits`, `SuppressFalseReachesEnqueue`) |
+| CLI request-body test (`--no-trigger` → `suppress_triggers:true`; omitted → key absent) | `server/cmd/multica/cmd_issue_test.go` (search `TestRunIssueCommentAddSendsSuppressTriggers`) |
+
 ## CLI id sources (where the UUID comes from)
 
 | List command | Field used as mention id | Source |

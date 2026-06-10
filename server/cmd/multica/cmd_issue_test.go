@@ -318,6 +318,74 @@ func TestRunIssueCreateShowsDuplicateMessage(t *testing.T) {
 	}
 }
 
+func newIssueCommentAddTestCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "add"}
+	cmd.Flags().String("content", "", "")
+	cmd.Flags().Bool("content-stdin", false, "")
+	cmd.Flags().String("content-file", "", "")
+	cmd.Flags().String("parent", "", "")
+	cmd.Flags().StringSlice("attachment", nil, "")
+	cmd.Flags().Bool("no-trigger", false, "")
+	cmd.Flags().String("output", "json", "")
+	return cmd
+}
+
+// TestRunIssueCommentAddSendsSuppressTriggers proves `--no-trigger` puts
+// suppress_triggers:true in the POST body, and that omitting it sends no such
+// key (so a normal comment still triggers).
+func TestRunIssueCommentAddSendsSuppressTriggers(t *testing.T) {
+	const issueID = "11111111-1111-1111-1111-111111111111"
+	for _, tc := range []struct {
+		name      string
+		noTrigger bool
+		wantKey   bool
+	}{
+		{"with --no-trigger sets suppress_triggers", true, true},
+		{"without --no-trigger omits suppress_triggers", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var body map[string]any
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/api/issues/"+issueID:
+					json.NewEncoder(w).Encode(map[string]any{
+						"id": issueID, "identifier": "MUL-9", "title": "T", "status": "todo", "priority": "none",
+					})
+				case r.Method == http.MethodPost && r.URL.Path == "/api/issues/"+issueID+"/comments":
+					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+						t.Errorf("decode body: %v", err)
+					}
+					json.NewEncoder(w).Encode(map[string]any{"id": "comment-1", "content": "hi"})
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer srv.Close()
+
+			t.Setenv("MULTICA_SERVER_URL", srv.URL)
+			t.Setenv("MULTICA_WORKSPACE_ID", "ws-1")
+			t.Setenv("MULTICA_TOKEN", "test-token")
+
+			cmd := newIssueCommentAddTestCmd()
+			_ = cmd.Flags().Set("content", "hi")
+			if tc.noTrigger {
+				_ = cmd.Flags().Set("no-trigger", "true")
+			}
+			if err := runIssueCommentAdd(cmd, []string{issueID}); err != nil {
+				t.Fatalf("runIssueCommentAdd: %v", err)
+			}
+			got, present := body["suppress_triggers"]
+			if tc.wantKey {
+				if got != true {
+					t.Fatalf("suppress_triggers = %#v (present=%v), want true", got, present)
+				}
+			} else if present {
+				t.Fatalf("suppress_triggers present (%#v), want absent for a normal comment", got)
+			}
+		})
+	}
+}
+
 func newIssuePullRequestsTestCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "pull-requests"}
 	cmd.Flags().String("output", "table", "")
