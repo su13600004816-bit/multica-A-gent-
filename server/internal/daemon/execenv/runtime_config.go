@@ -493,7 +493,7 @@ func buildMetaSkillContent(provider string, ctx TaskContextForEnv) string {
 	//     non-UTF-8 codepage (issues #2198 / #2236 / #2376) — which is why
 	//     Windows uses `--content-file`, not stdin.
 	// Because the corruption is shell-driven, the guardrail is provider-agnostic.
-	b.WriteString("- `multica issue comment add <issue-id> [--content \"...\" | --content-stdin | --content-file <path>] [--parent <comment-id>] [--attachment <path>]` — Post a comment. For agent-authored bodies, do NOT inline `--content` — the shell can rewrite backticks, `$()`, quotes, or newlines before the CLI sees them; use the platform-correct non-inline mode shown in ## Comment Formatting below. Run `multica issue comment add --help` for details.\n")
+	b.WriteString("- `multica issue comment add <issue-id> [--content \"...\" | --content-stdin | --content-file <path>] [--parent <comment-id>] [--no-trigger] [--attachment <path>]` — Post a comment. For agent-authored bodies, do NOT inline `--content` — the shell can rewrite backticks, `$()`, quotes, or newlines before the CLI sees them; use the platform-correct non-inline mode shown in ## Comment Formatting below. Add `--no-trigger` for a visible-but-silent comment that wakes no agent (see ## No-Trigger Comments below). Run `multica issue comment add --help` for details.\n")
 	b.WriteString("- `multica issue metadata list <issue-id> [--output json]` — List every metadata key pinned to an issue. Empty `{}` is normal.\n")
 	b.WriteString("- `multica issue metadata set <issue-id> --key <k> --value <v> [--type string|number|bool]` — Pin (or overwrite) a single metadata key. The CLI auto-infers JSON primitives, so URLs and plain text are stored as strings — pass `--type number` or `--type bool` only when the semantic type matters.\n")
 	b.WriteString("- `multica issue metadata delete <issue-id> --key <k>` — Remove a metadata key.\n\n")
@@ -724,6 +724,14 @@ func buildMetaSkillContent(provider string, ctx TaskContextForEnv) string {
 		}
 		b.WriteString("\n")
 	}
+
+	b.WriteString("## No-Trigger Comments\n\n")
+	b.WriteString("`multica issue comment add ... --no-trigger` posts a comment that is fully visible and streamed but wakes **no** agent — not the assignee, not the squad leader, not anyone @mentioned in it. Use it whenever the comment is for the record rather than a request to act:\n\n")
+	b.WriteString("- Close-out / sign-off summaries, status reports, and progress updates.\n")
+	b.WriteString("- Audit sync, watchdog notices, and canary / dry-run findings.\n")
+	b.WriteString("- Any acknowledgment or hand-back where you do NOT want the next agent to start a new run.\n\n")
+	b.WriteString("This is the authoritative way to break wake-up loops: a normal close-out comment that @mentions another agent re-triggers them, they reply, and you are triggered again. `--no-trigger` ends the thread without that cost. Reserve plain (triggering) comments for when you genuinely need the assignee or a specific agent to act next.\n\n")
+	b.WriteString("The legacy `/note` prefix still suppresses triggers for backward compatibility, but `--no-trigger` is preferred — it carries the intent in the request itself instead of the body text, so it cannot be defeated by reformatting.\n\n")
 
 	b.WriteString("## Mentions\n\n")
 	b.WriteString("Mention links are **side-effecting actions**, not just formatting:\n\n")

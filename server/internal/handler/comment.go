@@ -772,6 +772,14 @@ type CreateCommentRequest struct {
 	Type          string   `json:"type"`
 	ParentID      *string  `json:"parent_id"`
 	AttachmentIDs []string `json:"attachment_ids"`
+	// SuppressTriggers makes a comment "visible but silent": it is stored and
+	// streamed like any other comment, but no agent is ever woken by it. When
+	// true, CreateComment skips every trigger path (assignee on_comment, squad
+	// leader, and @mentioned agents). This is the request-level, authoritative
+	// form of the reserved /note prefix — the prefix stays as a compatibility
+	// fallback, but suppress_triggers is the source of truth so callers do not
+	// have to encode intent in the body. Set by the CLI's `--no-trigger` flag.
+	SuppressTriggers bool `json:"suppress_triggers"`
 }
 
 func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
@@ -925,7 +933,15 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	// must keep the resolved root in sync.
 	h.TaskService.AutoUnresolveThreadOnReply(r.Context(), rootComment, uuidToString(issue.WorkspaceID), authorType, authorID)
 
-	h.triggerTasksForComment(r.Context(), issue, comment, parentComment, authorType, authorID)
+	// suppress_triggers (CLI --no-trigger) makes the comment visible but silent:
+	// it is stored, streamed, and re-opens a resolved thread like any other
+	// comment, but wakes no agent. Gating the single triggerTasksForComment
+	// chokepoint covers all three wake paths at once (assignee, squad leader,
+	// @mentioned agents). This is the authoritative suppression mechanism; the
+	// /note prefix inside triggerTasksForComment remains only as a fallback.
+	if !req.SuppressTriggers {
+		h.triggerTasksForComment(r.Context(), issue, comment, parentComment, authorType, authorID)
+	}
 
 	writeJSON(w, http.StatusCreated, resp)
 }

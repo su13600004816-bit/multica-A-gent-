@@ -351,6 +351,7 @@ func init() {
 	issueCommentAddCmd.Flags().Bool("content-stdin", false, "Read comment content from stdin (preserves multi-line content verbatim)")
 	issueCommentAddCmd.Flags().String("content-file", "", "Read comment content from a UTF-8 file (preserves multi-line content verbatim; use this on Windows when stdin piping mangles non-ASCII bytes)")
 	issueCommentAddCmd.Flags().String("parent", "", "Parent comment ID (reply to a specific comment)")
+	issueCommentAddCmd.Flags().Bool("no-trigger", false, "Post the comment without waking any agent (assignee, squad leader, or @mentioned agents). Use for status reports, audit sync, close-out, watchdog, and canary notes that must be visible but not enqueue a new run.")
 	issueCommentAddCmd.Flags().StringSlice("attachment", nil, "File path(s) to attach (can be specified multiple times)")
 	issueCommentAddCmd.Flags().String("output", "json", "Output format: table or json")
 
@@ -1205,6 +1206,12 @@ func runIssueCommentAdd(cmd *cobra.Command, args []string) error {
 	body := map[string]any{"content": content}
 	if parentID, _ := cmd.Flags().GetString("parent"); parentID != "" {
 		body["parent_id"] = parentID
+	}
+	if noTrigger, _ := cmd.Flags().GetBool("no-trigger"); noTrigger {
+		// Visible-but-silent: server skips every agent wake path for this
+		// comment. The flag only sends the field when set, so default posts
+		// keep their existing request body byte-for-byte.
+		body["suppress_triggers"] = true
 	}
 	if len(attachmentIDs) > 0 {
 		body["attachment_ids"] = attachmentIDs
