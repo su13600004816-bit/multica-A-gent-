@@ -1686,6 +1686,87 @@ func TestCommentCRUD(t *testing.T) {
 	testHandler.DeleteIssue(w, req)
 }
 
+// TestSuppressTriggersSkipsWakePaths verifies that a comment posted with
+// suppress_triggers:true is stored but wakes no agent, while an otherwise
+// identical comment without the flag DOES enqueue the assignee's on_comment
+// task. The control half proves the issue/agent setup actually triggers, so the
+// zero-count on the suppressed half is attributable to suppression, not a dead
+// fixture.
+func TestSuppressTriggersSkipsWakePaths(t *testing.T) {
+	ctx := context.Background()
+
+	var agentID string
+	if err := testPool.QueryRow(ctx,
+		`SELECT id FROM agent WHERE workspace_id = $1 AND name = $2`,
+		testWorkspaceID, "Handler Test Agent",
+	).Scan(&agentID); err != nil {
+		t.Fatalf("failed to find test agent: %v", err)
+	}
+
+	// Active issue assigned to the agent → a plain member comment triggers the
+	// assignee on_comment path.
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":         "Suppress triggers test",
+		"status":        "in_progress",
+		"assignee_type": "agent",
+		"assignee_id":   agentID,
+	})
+	testHandler.CreateIssue(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateIssue: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var created IssueResponse
+	json.NewDecoder(w.Body).Decode(&created)
+
+	defer func() {
+		testPool.Exec(ctx, `DELETE FROM agent_task_queue WHERE issue_id = $1`, created.ID)
+		cleanupReq := newRequest("DELETE", "/api/issues/"+created.ID, nil)
+		cleanupReq = withURLParam(cleanupReq, "id", created.ID)
+		testHandler.DeleteIssue(httptest.NewRecorder(), cleanupReq)
+	}()
+
+	countTasks := func() int {
+		var n int
+		if err := testPool.QueryRow(ctx,
+			`SELECT count(*) FROM agent_task_queue WHERE issue_id = $1`, created.ID,
+		).Scan(&n); err != nil {
+			t.Fatalf("failed to count tasks: %v", err)
+		}
+		return n
+	}
+
+	// Suppressed comment: stored, but must enqueue nothing.
+	w = httptest.NewRecorder()
+	req = newRequest("POST", "/api/issues/"+created.ID+"/comments", map[string]any{
+		"content":           "close-out report — no action needed",
+		"suppress_triggers": true,
+	})
+	req = withURLParam(req, "id", created.ID)
+	testHandler.CreateComment(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateComment(suppressed): expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	if n := countTasks(); n != 0 {
+		t.Fatalf("suppress_triggers comment must enqueue no task, got %d", n)
+	}
+
+	// Control comment without the flag: the same setup must enqueue the
+	// assignee on_comment task, proving the fixture is live.
+	w = httptest.NewRecorder()
+	req = newRequest("POST", "/api/issues/"+created.ID+"/comments", map[string]any{
+		"content": "please take a look",
+	})
+	req = withURLParam(req, "id", created.ID)
+	testHandler.CreateComment(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateComment(control): expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	if n := countTasks(); n < 1 {
+		t.Fatalf("control comment without suppress_triggers must enqueue the assignee task, got %d", n)
+	}
+}
+
 func TestCreateCommentRejectsMalformedParentID(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := newRequest("POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{

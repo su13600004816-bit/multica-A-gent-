@@ -318,6 +318,75 @@ func TestRunIssueCreateShowsDuplicateMessage(t *testing.T) {
 	}
 }
 
+func newIssueCommentAddTestCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "add"}
+	cmd.Flags().String("content", "", "")
+	cmd.Flags().Bool("content-stdin", false, "")
+	cmd.Flags().String("content-file", "", "")
+	cmd.Flags().String("parent", "", "")
+	cmd.Flags().Bool("no-trigger", false, "")
+	cmd.Flags().StringSlice("attachment", nil, "")
+	cmd.Flags().String("output", "json", "")
+	return cmd
+}
+
+// TestRunIssueCommentAddSendsSuppressTriggers verifies that --no-trigger maps to
+// suppress_triggers:true in the request body, and that omitting the flag leaves
+// the field out entirely (so default posts keep their original body shape).
+func TestRunIssueCommentAddSendsSuppressTriggers(t *testing.T) {
+	const issueID = "11111111-1111-1111-1111-111111111111"
+
+	run := func(t *testing.T, setNoTrigger bool) map[string]any {
+		t.Helper()
+		var body map[string]any
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodGet && r.URL.Path == "/api/issues/"+issueID:
+				json.NewEncoder(w).Encode(map[string]any{
+					"id": issueID, "identifier": "MUL-1", "title": "T", "status": "in_progress",
+				})
+			case r.Method == http.MethodPost && r.URL.Path == "/api/issues/"+issueID+"/comments":
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Errorf("decode body: %v", err)
+				}
+				w.WriteHeader(http.StatusCreated)
+				json.NewEncoder(w).Encode(map[string]any{"id": "comment-1"})
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer srv.Close()
+
+		t.Setenv("MULTICA_SERVER_URL", srv.URL)
+		t.Setenv("MULTICA_WORKSPACE_ID", "ws-1")
+		t.Setenv("MULTICA_TOKEN", "test-token")
+
+		cmd := newIssueCommentAddTestCmd()
+		_ = cmd.Flags().Set("content", "status report")
+		if setNoTrigger {
+			_ = cmd.Flags().Set("no-trigger", "true")
+		}
+		if err := runIssueCommentAdd(cmd, []string{issueID}); err != nil {
+			t.Fatalf("runIssueCommentAdd: %v", err)
+		}
+		return body
+	}
+
+	t.Run("with --no-trigger", func(t *testing.T) {
+		body := run(t, true)
+		if got := body["suppress_triggers"]; got != true {
+			t.Fatalf("suppress_triggers = %#v, want true", got)
+		}
+	})
+
+	t.Run("without --no-trigger omits the field", func(t *testing.T) {
+		body := run(t, false)
+		if _, present := body["suppress_triggers"]; present {
+			t.Fatalf("suppress_triggers must be absent by default, got %#v", body["suppress_triggers"])
+		}
+	})
+}
+
 func newIssuePullRequestsTestCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "pull-requests"}
 	cmd.Flags().String("output", "table", "")

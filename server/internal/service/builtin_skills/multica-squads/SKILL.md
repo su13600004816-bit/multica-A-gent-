@@ -177,6 +177,18 @@ Current behavior: resolve the squad, read `leader_id`, enqueue a leader task,
 and use the current comment as the trigger comment. It does not enqueue every
 squad member.
 
+To post a comment that is visible but wakes no agent — close-out reports, audit
+sync, watchdog notices, canary findings, status updates — add `--no-trigger`:
+
+```bash
+multica issue comment add <issue-id> --content-stdin --no-trigger
+```
+
+It sends `suppress_triggers:true`, and the server skips every wake path
+(assignee, squad leader, and @mentioned agents). This is the authoritative way
+to end a thread without re-triggering the other side; the legacy `/note` content
+prefix still suppresses triggers but is only a compatibility fallback.
+
 ## Autopilot behavior
 
 Autopilots can be assigned to squads. For `assignee_type = "squad"`:

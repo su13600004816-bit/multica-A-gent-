@@ -156,6 +156,52 @@ func TestCommentTriggeredProtocolDoesNotForceInReview(t *testing.T) {
 	}
 }
 
+// The brief must teach the --no-trigger / suppress_triggers protocol so agents
+// use visible-but-silent comments for close-out, audit sync, watchdog, canary,
+// and status reports instead of waking the next agent and starting a loop.
+// Rendered across task kinds because the wake-loop risk is not specific to one.
+func TestNoTriggerProtocolInBrief(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		ctx  TaskContextForEnv
+	}{
+		{
+			name: "assignment-triggered",
+			ctx:  TaskContextForEnv{IssueID: "11111111-2222-3333-4444-555555555555"},
+		},
+		{
+			name: "comment-triggered",
+			ctx: TaskContextForEnv{
+				IssueID:          "22222222-3333-4444-5555-666666666666",
+				TriggerCommentID: "33333333-4444-5555-6666-777777777777",
+			},
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out := buildMetaSkillContent("claude", tc.ctx)
+
+			if !strings.Contains(out, "## No-Trigger Comments") {
+				t.Fatalf("[%s] expected `## No-Trigger Comments` section", tc.name)
+			}
+			if !strings.Contains(out, "--no-trigger") {
+				t.Errorf("[%s] brief must mention the --no-trigger flag", tc.name)
+			}
+			// The comment-add command entry must advertise the flag too.
+			if !strings.Contains(out, "[--no-trigger]") {
+				t.Errorf("[%s] comment add command usage must list [--no-trigger]", tc.name)
+			}
+			// /note must be framed as a compatibility fallback, not the primary path.
+			if !strings.Contains(out, "/note") {
+				t.Errorf("[%s] brief must still reference /note as the compatibility fallback", tc.name)
+			}
+		})
+	}
+}
+
 // The CLAUDE.md workflow surface must carry the same issue-wide since-delta
 // new-comment hint as the per-turn prompt. PR #2816 requires the two surfaces
 // stay in sync.

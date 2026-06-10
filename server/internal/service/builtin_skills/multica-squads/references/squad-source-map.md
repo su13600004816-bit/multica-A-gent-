@@ -130,6 +130,11 @@ Contracts:
 
 - commenting on a squad-assigned issue can wake the leader
   (comment.go:940-941 → shouldEnqueueSquadLeaderOnComment at squad.go:909);
+- a comment posted with `suppress_triggers:true` (CLI `--no-trigger`) is stored
+  but wakes no agent: CreateComment skips the whole triggerTasksForComment
+  chokepoint, so assignee, squad leader, and @mention paths are all bypassed
+  (comment.go CreateComment suppress gate). The reserved `/note` content prefix
+  is the compatibility fallback (isNoteComment in comment.go);
 - explicit `mention://squad/<id>` resolves squad and enqueues leader
   (comment.go:1089);
 - squad mention does not fan out to members — enqueue targets `squad.LeaderID`
