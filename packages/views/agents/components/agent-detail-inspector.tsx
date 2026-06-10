@@ -74,7 +74,7 @@ interface InspectorProps {
    * row is read-only and deep-links here; Manage / Disconnect live in the
    * tab so the destructive action exists in exactly one place.
    */
-  onShowIntegrations: () => void;
+  onShowIntegrations?: () => void;
 }
 
 /**
@@ -233,7 +233,7 @@ export function AgentDetailInspector({
             <LarkAgentBindButton
               agentId={agent.id}
               agentName={agent.name}
-              onShowConnectedDetails={onShowIntegrations}
+              onShowConnectedDetails={onShowIntegrations ?? (() => {})}
             />
           </div>
         </div>
