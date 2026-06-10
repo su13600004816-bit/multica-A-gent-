@@ -2,8 +2,9 @@
 // line-orchestrator canvas.
 //
 // MIGRATION (PL-157, phase 1): ported verbatim from the legacy canvas station
-// (ouroboros-circuit-console, `src/lib/line-ir.ts`). Per the migration SPEC
-// (docs/tech-assets/canvas-orchestration/SPEC.md §5) this compiler is fully
+// (ouroboros-circuit-console, `src/lib/line-ir.ts`). Per the migration SPEC §5
+// (tracked in PL-152, authored in PR #10; once that lands it lives at
+// docs/tech-assets/canvas-orchestration/SPEC.md) this compiler is fully
 // backend-agnostic and is reused as-is — only the `CircuitStatus` import path
 // changed and one `noUncheckedIndexedAccess` guard was added. `compileToWaves`
 // (Kahn topological layering) and `validateLine` are the reused core.

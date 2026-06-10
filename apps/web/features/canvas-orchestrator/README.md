@@ -3,8 +3,11 @@
 Migrating the legacy canvas station's **visual line-orchestrator console**
 (`ouroboros-circuit-console`, disk `/home/fleet/canvas`) into multica.
 
-Source SPEC: `docs/tech-assets/canvas-orchestration/SPEC.md` (PL-152). Tracking
-issue: **PL-157**.
+Source SPEC: the canvas-orchestration migration SPEC, tracked in **PL-152** and
+authored in PR #10. Once PR #10 lands it lives at
+`docs/tech-assets/canvas-orchestration/SPEC.md`; this feature does not require
+that file to be present and is safe to merge independently. Tracking issue:
+**PL-157**.
 
 The product goal: a draggable canvas where you lay out a production line as a
 DAG of dev/audit nodes, compile it into topological **waves**, dispatch each
