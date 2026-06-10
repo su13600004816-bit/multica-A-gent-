@@ -195,3 +195,58 @@ func TestInSquadAgentMention_NotSuppressedForOutsideAgent(t *testing.T) {
 		t.Fatalf("non-member agent @agent mention on squad issue must enqueue; got %d", got)
 	}
 }
+
+// countTasksForTriggerComment returns how many tasks (in ANY status) a single
+// comment has produced for a given agent. It is the assertion lens for the
+// trigger-comment single-execution lock, which keys on (trigger_comment_id,
+// agent_id) regardless of status — unlike countQueuedOrDispatched.
+func countTasksForTriggerComment(t *testing.T, commentID, agentID string) int {
+	t.Helper()
+	var n int
+	if err := testPool.QueryRow(context.Background(), `
+		SELECT count(*) FROM agent_task_queue
+		WHERE trigger_comment_id = $1 AND agent_id = $2
+	`, util.MustParseUUID(commentID), util.MustParseUUID(agentID)).Scan(&n); err != nil {
+		t.Fatalf("count tasks for trigger comment: %v", err)
+	}
+	return n
+}
+
+// TestTriggerComment_SingleExecutionLock proves the trigger-comment single-
+// execution lock: once a comment has produced a task for an agent, the SAME
+// comment re-entering the trigger path (an edit, or a watchdog re-route onto a
+// PASS comment) must NOT enqueue a second run for that agent — even after the
+// first task has completed and the queued/dispatched dedup no longer applies.
+// This is the structural guard against one PASS comment pulling the next round.
+func TestTriggerComment_SingleExecutionLock(t *testing.T) {
+	if testHandler == nil || testPool == nil {
+		t.Skip("database not available")
+	}
+	ctx := context.Background()
+	fx := newSquadMentionLoopFixture(t)
+
+	// Use the non-squad agent issue so the in-squad mention suppression (a
+	// separate, earlier guard) does not mask the lock under test.
+	comment := makeAgentComment(t, uuidToString(fx.AgentIssue.ID), fx.LeaderID, agentMention(fx.TargetID))
+
+	// First trigger: the mention enqueues exactly one task for the target.
+	testHandler.enqueueMentionedAgentTasks(ctx, fx.AgentIssue, comment, nil, "agent", fx.LeaderID)
+	if got := countTasksForTriggerComment(t, uuidToString(comment.ID), fx.TargetID); got != 1 {
+		t.Fatalf("first trigger: expected 1 task for target, got %d", got)
+	}
+
+	// Complete the task so the queued/dispatched dedup no longer blocks — from
+	// here only the trigger-comment lock can prevent a second enqueue.
+	if _, err := testPool.Exec(ctx, `
+		UPDATE agent_task_queue SET status = 'completed', completed_at = now()
+		WHERE trigger_comment_id = $1
+	`, comment.ID); err != nil {
+		t.Fatalf("complete first task: %v", err)
+	}
+
+	// Re-trigger from the SAME comment: must NOT create a second task.
+	testHandler.enqueueMentionedAgentTasks(ctx, fx.AgentIssue, comment, nil, "agent", fx.LeaderID)
+	if got := countTasksForTriggerComment(t, uuidToString(comment.ID), fx.TargetID); got != 1 {
+		t.Fatalf("re-trigger from the same comment must not enqueue a second run; got %d total tasks", got)
+	}
+}

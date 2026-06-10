@@ -1055,6 +1055,18 @@ func (h *Handler) enqueueSquadLeaderTask(ctx context.Context, issue db.Issue, tr
 		return
 	}
 
+	// Single-execution lock: a given comment must not enqueue more than one
+	// leader run, even after a prior one completed or the watchdog re-routes
+	// onto the same PASS comment. This is the structural guard against the
+	// comment→leader→...→comment storm.
+	hasTriggered, err := h.Queries.HasTaskForTriggerCommentAndAgent(ctx, db.HasTaskForTriggerCommentAndAgentParams{
+		TriggerCommentID: triggerCommentID,
+		AgentID:          squad.LeaderID,
+	})
+	if err != nil || hasTriggered {
+		return
+	}
+
 	if _, err := h.TaskService.EnqueueTaskForSquadLeader(ctx, issue, squad.LeaderID, triggerCommentID); err != nil {
 		slog.Warn("enqueue squad leader task failed",
 			"issue_id", uuidToString(issue.ID),

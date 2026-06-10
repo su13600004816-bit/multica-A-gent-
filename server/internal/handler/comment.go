@@ -1169,6 +1169,16 @@ func (h *Handler) enqueueMentionedAgentTasks(ctx context.Context, issue db.Issue
 			if err != nil || hasPending {
 				continue
 			}
+			// Single-execution lock: this comment must not enqueue more than one
+			// leader run, even after a prior one completed or the comment is
+			// re-routed onto. Breaks the same-PASS-comment re-trigger storm.
+			hasTriggered, err := h.Queries.HasTaskForTriggerCommentAndAgent(ctx, db.HasTaskForTriggerCommentAndAgentParams{
+				TriggerCommentID: comment.ID,
+				AgentID:          leaderID,
+			})
+			if err != nil || hasTriggered {
+				continue
+			}
 			if _, err := h.TaskService.EnqueueTaskForSquadLeader(ctx, issue, leaderID, comment.ID); err != nil {
 				slog.Warn("enqueue squad leader mention task failed", "issue_id", uuidToString(issue.ID), "squad_id", m.ID, "error", err)
 			}
@@ -1213,6 +1223,17 @@ func (h *Handler) enqueueMentionedAgentTasks(ctx context.Context, issue db.Issue
 			AgentID: agentUUID,
 		})
 		if err != nil || hasPending {
+			continue
+		}
+		// Single-execution lock: this comment must not enqueue more than one run
+		// for this agent, even after a prior one completed or the comment is
+		// edited and re-enters the trigger path. Breaks the same-comment
+		// re-trigger storm.
+		hasTriggered, err := h.Queries.HasTaskForTriggerCommentAndAgent(ctx, db.HasTaskForTriggerCommentAndAgentParams{
+			TriggerCommentID: comment.ID,
+			AgentID:          agentUUID,
+		})
+		if err != nil || hasTriggered {
 			continue
 		}
 		// Always use the current comment as the trigger so the agent reads the
