@@ -1,22 +1,29 @@
-===== X51 — GitHub ref 真网络校验需 gh PAT =====
-$ which gh && gh --version
-/usr/bin/gh
-gh version 2.93.0 (2026-05-27)
-$ gh auth status
-You are not logged into any GitHub hosts. To log in, run: gh auth login
-证据:gh 二进制就绪,但未登录任何 GitHub host → verify_github_refs(verify_network=True)
-      会因无 token 失败。结论:X51 = BLOCKED(缺 gh PAT,repo.env 标注'待配')。
+PL-140 BLOCKED 项真实探测证据(本轮返工复采)
+采集时间口径:2026-06-10(fleet 身份,生产宿主)
 
-===== X72 — P0 外部通知通道(Slack/SMS)需 webhook/凭据 =====
-$ env | grep -iE 'SLACK|TWILIO|SMS|WEBHOOK|PAGER'
-(无任何外部通知凭据)
-证据:无外部通知通道凭据 → P0 告警无法外发。脚本侧 ack 账本(p0_ack_entry/
-      pending_p0_acks)已闭环并单测;外发通道 = BLOCKED(需平台 webhook)。
+[X51] 现役证据链接入真 GitHub API 校验 —— 凭据缺口
+  $ curl -s -o /dev/null -w '%{http_code}' https://api.github.com/user
+  -> HTTP 401 (无凭据)
+  $ ls -la /etc/squad/github_pat
+  -> Permission denied (root-only,fleet 取不到)
+  ~/.config/squad 无 token 文件;repo.env 自注 "# PR 需要 gh PAT(待配)"
+  结论:line_evidence.verify_github_refs(verify_network=True) 能力具备,但 hot path
+        无可用 token,保持 BLOCKED(凭据);owner=总管/平台。
 
-===== X20 — 证据绑定'专属 API 凭据主体'需平台身份系统 =====
-$ env | grep -iE 'API_KEY|CRED_SUBJECT|IDENTITY_TOKEN|MTLS|CLIENT_CERT'
-(无 per-agent 凭据主体/mTLS 客户端证书)
-$ multica --help | grep -iE 'credential|identity|subject|cert'
-(multica CLI 未暴露 credential/identity/subject 子命令)
-证据:无 per-agent 凭据主体,multica 也未暴露身份/凭据子命令 → classify_source
-      只能按声明身份字符串分级,无法防伪造。结论:X20 = BLOCKED(需平台身份系统)。
+[X63] 心跳外部 watcher 安装启用 —— 安装缺口
+  $ systemctl is-enabled line-watchdog-heartbeat.timer
+  -> Failed to get unit file state ... No such file or directory (未安装)
+  $ ls /etc/systemd/system/line-watchdog-heartbeat*
+  -> 不存在
+  squad-ops v2 子命令集无 systemd install/enable 能力。
+  结论:unit 文件 + heartbeat-check CLI 就绪,但未安装启用,保持 BLOCKED;owner=总管/ops。
+
+[X72] P0 外部通知 + 人工 ACK 闭环 —— 外部通道缺口
+  $ env | grep -iE 'slack|webhook|smtp|notify'
+  -> (空) 无任何外部通知通道配置
+  结论:p0_ack_entry/pending_p0_acks 账本就绪,外部通知出口未接,保持 BLOCKED;owner=平台/总管。
+
+[X20] 平台硬禁普通 agent 冒充专属(Qwen/DeepSeek)身份 —— 平台强制缺口
+  脚本策略层成立:line_bridge.py:122-124,154-156 拒非专属 API 路由;
+  line_evidence.py:348/361 trust policy 现役采信(line_watchdog.py)。
+  "平台硬拒冒充" 需服务端身份校验,非脚本可保证 → 保持 BLOCKED(平台);owner=平台。

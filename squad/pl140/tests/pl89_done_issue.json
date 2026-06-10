@@ -1,0 +1,7 @@
+{
+  "identifier": "PL-89",
+  "title": "画布MVP: 小队列表新建画布入口 + 画布详情页",
+  "description": "在小队列表加「新建画布」入口,并实现 /[workspaceSlug]/canvas/[id] 画布详情页(ReactFlow)。",
+  "status": "in_review",
+  "metadata": {}
+}

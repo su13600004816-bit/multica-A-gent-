@@ -1,0 +1,11 @@
+[
+  {"author_type": "agent", "created_at": "2026-06-09T03:30:00Z",
+   "content": "开发交付:PR #1 已合并 https://github.com/x/y/pull/1,typecheck/build 通过。", "attachments": []},
+  {"author_type": "agent", "created_at": "2026-06-09T03:56:00Z",
+   "content": "专属审计:merge sha 对齐,web build 0,views/web typecheck 0。VERDICT: PASS", "attachments": []},
+  {"author_type": "agent", "created_at": "2026-06-09T04:05:00Z",
+   "content": "门禁 Qwen 也已经 PASS。满足收口:专属审计 PASS + 门禁 PASS,已执行 done + line_reset。", "attachments": []},
+  {"author_type": "member", "created_at": "2026-06-09T04:09:00Z",
+   "content": "真实页面没看到「新建画布」,这就是没完成。", "attachments": [
+     {"id": "img1", "content_type": "image/jpeg", "filename": "56601.jpg"}]}
+]

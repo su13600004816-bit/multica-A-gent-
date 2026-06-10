@@ -1,0 +1,5 @@
+{
+  "_comment": "每条 issue 的最近一条评论时间(供阶段推进 stage_stale 检测)。相对 WATCHDOG_NOW=04:28:00Z。",
+  "8bcfaeb5-8b2a-45e1-983a-2e79d319f6b5": "2026-06-09T04:16:34Z",
+  "2b2fc294-f96a-4e38-a8de-a33e2ce214f8": "2026-06-09T04:21:00Z"
+}

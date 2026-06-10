@@ -1,0 +1,57 @@
+[
+  {
+    "id": "2b2fc294-f96a-4e38-a8de-a33e2ce214f8",
+    "identifier": "PL-91",
+    "title": "开发正常交付转 in_review,但 5 分钟内无专属审计 run(dev_done→审计 超时)",
+    "status": "in_review",
+    "assignee_id": "7dafa944-07b8-4fba-ab3d-1b7ae0ceda96",
+    "assignee_type": "squad",
+    "parent_issue_id": null,
+    "number": 91,
+    "updated_at": "2026-06-09T04:14:00Z"
+  },
+  {
+    "id": "9a000000-0000-0000-0000-0000000000a2",
+    "identifier": "PL-91G",
+    "title": "专属审计正常 PASS,但 5 分钟内未跑真门禁(audit_pass→gate 超时)",
+    "status": "in_review",
+    "assignee_id": "7dafa944-07b8-4fba-ab3d-1b7ae0ceda96",
+    "assignee_type": "squad",
+    "parent_issue_id": null,
+    "number": 911,
+    "updated_at": "2026-06-09T04:20:00Z"
+  },
+  {
+    "id": "8bcfaeb5-8b2a-45e1-983a-2e79d319f6b5",
+    "identifier": "PL-89D",
+    "title": "真门禁正常 PASS,但 5 分钟内未 done/reset 收口(gate_pass→done 超时)",
+    "status": "in_review",
+    "assignee_id": "7dafa944-07b8-4fba-ab3d-1b7ae0ceda96",
+    "assignee_type": "squad",
+    "parent_issue_id": null,
+    "number": 89,
+    "updated_at": "2026-06-09T04:21:00Z"
+  },
+  {
+    "id": "7b000000-0000-0000-0000-0000000000r4",
+    "identifier": "PL-89R",
+    "title": "门禁/页面视觉 FAIL,但 5 分钟内未派返工 run(gate_fail→返工 超时)",
+    "status": "in_progress",
+    "assignee_id": "7dafa944-07b8-4fba-ab3d-1b7ae0ceda96",
+    "assignee_type": "squad",
+    "parent_issue_id": null,
+    "number": 892,
+    "updated_at": "2026-06-09T04:22:00Z"
+  },
+  {
+    "id": "5c000000-0000-0000-0000-0000000000h5",
+    "identifier": "PL-89H",
+    "title": "审计 PASS 且 gate run 已启动(对照组:推进正常,不应告警)",
+    "status": "in_review",
+    "assignee_id": "7dafa944-07b8-4fba-ab3d-1b7ae0ceda96",
+    "assignee_type": "squad",
+    "parent_issue_id": null,
+    "number": 893,
+    "updated_at": "2026-06-09T04:26:00Z"
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {"author_type": "agent", "created_at": "2026-06-09T05:30:00Z",
+   "content": "返工交付:PR #2 已合并 https://github.com/x/y/pull/2,新建画布入口已上线,typecheck/build 通过。", "attachments": []},
+  {"author_type": "agent", "created_at": "2026-06-09T05:50:00Z",
+   "content": "专属审计:代码+构建+截图复核齐全。VERDICT: PASS", "attachments": []},
+  {"author_type": "agent", "created_at": "2026-06-09T06:00:00Z",
+   "content": "【门禁 Qwen · 真机检验判定】\n\n真站 https://app.example.com/acme/canvas 已能看到「新建画布」,详情页 ReactFlow 正常。\nVERDICT: PASS 真机可见,达成目标。", "attachments": [
+     {"id": "shot1", "content_type": "image/png", "filename": "canvas_real.png"}]}
+]

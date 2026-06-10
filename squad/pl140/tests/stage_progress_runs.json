@@ -1,0 +1,61 @@
+{
+  "_comment": "BOM-3 deadline 回归:状态定格 2026-06-09T04:28:00Z,deadline=5 分钟。每个 issue 的最新关键 run 是『正常完成』的阶段产出,但下一环节超时未推进。runs 按新->旧。",
+  "2b2fc294-f96a-4e38-a8de-a33e2ce214f8": [
+    {
+      "id": "dev-pl91-ok",
+      "status": "completed",
+      "result": {"output": "开发交付:typecheck/build 通过,已 push。PR #3 已提。", "pr_url": "https://github.com/x/y/pull/3"},
+      "error": null,
+      "agent_id": "be3d60e9-3d86-4c73-9445-145229935c90",
+      "created_at": "2026-06-09T04:14:00Z"
+    }
+  ],
+  "9a000000-0000-0000-0000-0000000000a2": [
+    {
+      "id": "audit-pl91g-pass",
+      "status": "completed",
+      "result": {"output": "专属审计 VERDICT: PASS,代码与运行证据齐全,可进门禁。", "pr_url": ""},
+      "error": null,
+      "agent_id": "b55204d5-5438-4541-b797-13863884db0b",
+      "created_at": "2026-06-09T04:20:00Z"
+    }
+  ],
+  "8bcfaeb5-8b2a-45e1-983a-2e79d319f6b5": [
+    {
+      "id": "gate-pl89d-pass",
+      "status": "completed",
+      "result": {"output": "【门禁 Qwen】真机可见新建画布入口,视觉达成 VERDICT: PASS。", "pr_url": ""},
+      "error": null,
+      "agent_id": "qwen00000000000000000000000000gate00",
+      "created_at": "2026-06-09T04:21:00Z"
+    }
+  ],
+  "7b000000-0000-0000-0000-0000000000r4": [
+    {
+      "id": "gate-pl89r-fail",
+      "status": "completed",
+      "result": {"output": "【门禁 Qwen】真机未见新建画布入口,页面视觉 VERDICT: FAIL,需返工。", "pr_url": ""},
+      "error": null,
+      "agent_id": "qwen00000000000000000000000000gate00",
+      "created_at": "2026-06-09T04:22:00Z"
+    }
+  ],
+  "5c000000-0000-0000-0000-0000000000h5": [
+    {
+      "id": "gate-pl89h-running",
+      "status": "running",
+      "result": null,
+      "error": null,
+      "agent_id": "qwen00000000000000000000000000gate00",
+      "created_at": "2026-06-09T04:26:00Z"
+    },
+    {
+      "id": "audit-pl89h-pass",
+      "status": "completed",
+      "result": {"output": "专属审计 VERDICT: PASS,已交门禁。", "pr_url": ""},
+      "error": null,
+      "agent_id": "b55204d5-5438-4541-b797-13863884db0b",
+      "created_at": "2026-06-09T04:19:00Z"
+    }
+  ]
+}

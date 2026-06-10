@@ -1,0 +1,24 @@
+[
+  {
+    "id": "8bcfaeb5-8b2a-45e1-983a-2e79d319f6b5",
+    "identifier": "PL-89",
+    "title": "画布MVP: 小队列表新建画布入口 + 画布详情页",
+    "status": "in_progress",
+    "assignee_id": "7dafa944-07b8-4fba-ab3d-1b7ae0ceda96",
+    "assignee_type": "squad",
+    "parent_issue_id": null,
+    "number": 89,
+    "updated_at": "2026-06-09T04:16:34Z"
+  },
+  {
+    "id": "2b2fc294-f96a-4e38-a8de-a33e2ce214f8",
+    "identifier": "PL-91",
+    "title": "画布详情页交互/视觉收口",
+    "status": "in_review",
+    "assignee_id": "7dafa944-07b8-4fba-ab3d-1b7ae0ceda96",
+    "assignee_type": "squad",
+    "parent_issue_id": null,
+    "number": 91,
+    "updated_at": "2026-06-09T04:21:00Z"
+  }
+]

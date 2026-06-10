@@ -1,0 +1,47 @@
+{
+  "_comment": "回归样本:状态定格在 2026-06-09T04:28:00Z(即真实看门狗误报 WATCHDOG OK 的那一刻)。runs 按新->旧排列。",
+  "8bcfaeb5-8b2a-45e1-983a-2e79d319f6b5": [
+    {
+      "id": "f70159f8-4635-492b-89cc-434d9fd1d1b1",
+      "status": "cancelled",
+      "result": null,
+      "error": null,
+      "agent_id": "be3d60e9-3d86-4c73-9445-145229935c90",
+      "created_at": "2026-06-09T04:10:59Z"
+    },
+    {
+      "id": "2a9bfdc1-c5d3-4e50-a82a-18e8dc6b1115",
+      "status": "completed",
+      "result": {"output": "当前占位岗被直接 @mention 时不能做千问门禁判定,这是占位岗误触发,不能冒充千问结果给 PASS/FAIL,需要把调用方式纠正到 line_bridge.py gate。", "pr_url": ""},
+      "error": null,
+      "agent_id": "ce7edf7d-2dc5-43c6-b6e4-034f903990fc",
+      "created_at": "2026-06-09T04:16:34Z"
+    },
+    {
+      "id": "13cef131-6c5c-4342-b4d9-6e9f0436143b",
+      "status": "completed",
+      "result": {"output": "门禁 Qwen VERDICT: PASS;专属审计 VERDICT: PASS;PR #1 已合并。", "pr_url": "https://github.com/x/y/pull/1"},
+      "error": null,
+      "agent_id": "514f9573-4cf9-4b99-b13f-238967893d63",
+      "created_at": "2026-06-09T04:05:50Z"
+    }
+  ],
+  "2b2fc294-f96a-4e38-a8de-a33e2ce214f8": [
+    {
+      "id": "aa000000-0000-0000-0000-0000000000a1",
+      "status": "cancelled",
+      "result": null,
+      "error": null,
+      "agent_id": "b55204d5-5438-4541-b797-13863884db0b",
+      "created_at": "2026-06-09T04:20:00Z"
+    },
+    {
+      "id": "aa000000-0000-0000-0000-0000000000a2",
+      "status": "completed",
+      "result": {"output": "开发交付:typecheck/build 通过,已 push。", "pr_url": "https://github.com/x/y/pull/3"},
+      "error": null,
+      "agent_id": "be3d60e9-3d86-4c73-9445-145229935c90",
+      "created_at": "2026-06-09T04:14:00Z"
+    }
+  ]
+}
