@@ -12,7 +12,7 @@
 - `line_evidence.py` —— X32/X51 依赖(`evidence_is_stale` / `verify_github_refs` 等)。
 - `tests/test_pl140_partial.py`(33 条)+ `tests/test_line_mechanism.py`(143 条,含
   emit_observability 现役路径,跑出 `CROSS_VALIDATE_OK` / `MEMBER_STATS` / `STATUS_SIGNED`)。
-- `systemd/line-watchdog-heartbeat.{service,timer}` + `install.sh` —— X63 进程外心跳 watcher(待 ops 安装)。
+- `systemd/line-watchdog-heartbeat.{service,timer}` + `install.sh` —— X63 进程外心跳 watcher;`install.sh` 已把这两个单元纳入 `cp` + `systemctl enable --now line-watchdog-heartbeat.timer` 路径,运维一条命令即装载。
 - `BLOCKED_OWNER_ACCEPTANCE.md` + `probes/blocked_evidence.txt` —— X20/X51/X63/X72 平台/凭据/外部缺口与验收口径。
 
 ## 现役热路径接入 call site(本轮返工核心)
@@ -50,17 +50,34 @@ WATCHDOG_DRY_RUN=1 WATCHDOG_NOW="2026-06-10T01:00:00Z" WATCHDOG_FIXTURE="$D/issu
 python3 -m unittest tests.test_pl140_partial
 
 # 2) X32 端到端:PASS 之后又出现 failed run → 旧 PASS 失效 → BLOCK(exit 2)
+#    VERDICT 必须落在【结论位】(行首,或紧跟句末标点 。.!? 之后)才被 standalone_verdict() 认作结论;
+#    被字句包裹的引用(如 "专属审计 VERDICT: PASS")不算结论,会导致 ALLOW 场景误判 BLOCK。
+#    下面 fixture 的结论位与 tests/test_pl140_partial.py::X32DoneGateFreshness 完全一致。
 D=$(mktemp -d)
 printf '%s' '{"identifier":"PL-X32","status":"in_review","description":"x","metadata":{}}' > "$D/i.json"
-printf '%s' '[{"author_type":"agent","created_at":"2026-06-10T00:00:00Z","content":"开发交付:已 push,typecheck 通过。"},{"author_type":"agent","created_at":"2026-06-10T00:05:00Z","content":"专属审计 VERDICT: PASS"},{"author_type":"agent","created_at":"2026-06-10T00:06:00Z","content":"【门禁 Qwen】VERDICT: PASS"}]' > "$D/c.json"
+printf '%s' '[{"author_type":"agent","created_at":"2026-06-10T00:00:00Z","content":"开发交付:已 push,typecheck 通过。"},{"author_type":"agent","created_at":"2026-06-10T00:05:00Z","content":"专属审计:复核齐全。VERDICT: PASS"},{"author_type":"agent","created_at":"2026-06-10T00:06:00Z","content":"【门禁 Qwen】结论。VERDICT: PASS"}]' > "$D/c.json"
 echo '[{"id":"r2","status":"failed","created_at":"2026-06-10T00:10:00Z"}]' > "$D/r.json"
 DONE_GATE_ISSUE_FIXTURE="$D/i.json" DONE_GATE_COMMENTS_FIXTURE="$D/c.json" DONE_GATE_RUNS_FIXTURE="$D/r.json" \
   python3 line_done_gate.py PL-X32; echo "exit=$?"   # → ⛔ BLOCK / exit=2
-# 把 r.json 换成 completed@00:04 → ✅ ALLOW / exit=0
+# 把 r.json 换成 [{"id":"r1","status":"completed","created_at":"2026-06-10T00:04:00Z"}](PASS 之前的更早 run)
+# → ✅ ALLOW / exit=0
 
-# 3) X63 心跳 CLI:停摆 → exit 2 / 新鲜 → exit 0
+# 3) X47 端到端:现役热路径 line_watchdog.py --emit-observability → 逐轮 cycle 账本 cycles.jsonl 落盘
+#    wiring 见 line_watchdog.py::emit_observability(build_cycle_ledger/write_cycle_ledger);
+#    落盘目录由 LINE_EVIDENCE_LEDGER_DIR 决定(离线指向临时目录,不污染生产)。
+D=$(mktemp -d)
+printf '%s' '[{"id":"11111111-1111-1111-1111-111111111111","identifier":"PL-T1","status":"in_progress","assignee_id":"0f0013ea-a65d-4ab8-b1b4-17e14da8ab52","assignee_type":"squad","updated_at":"2026-06-10T00:00:00Z","created_at":"2026-06-09T00:00:00Z"}]' > "$D/issues.json"
+printf '%s' '[{"id":"0f0013ea-a65d-4ab8-b1b4-17e14da8ab52","name":"线小队-T03","leader_id":"b70d9b47-4243-4c91-9393-8034fe413ede"}]' > "$D/squads.json"
+WATCHDOG_DRY_RUN=1 WATCHDOG_NOW="2026-06-10T01:00:00Z" WATCHDOG_FIXTURE="$D/issues.json" \
+  WATCHDOG_SQUADS_FIXTURE="$D/squads.json" WATCHDOG_ISSUE_LIMIT=2 \
+  WATCHDOG_STATE="$D/state.json" WATCHDOG_STATUS_F="$D/status.json" WATCHDOG_HEARTBEAT_F="$D/hb.json" \
+  LINE_EVIDENCE_LEDGER_DIR="$D/evidence" \
+  python3 line_watchdog.py --emit-observability 2>&1 | grep -E "OBSERVABILITY_EMITTED"
+cat "$D/evidence/cycles.jsonl"   # → 每轮一行 cycle 账本(cycle_at/scanned/gate_status/...)
+
+# 4) X63 心跳 CLI:停摆 → exit 2 / 新鲜 → exit 0
 python3 line_partial.py heartbeat-check <heartbeat.json> 10
 
-# 4) X20/X51/X72 缺凭据探测(输出即证据)
+# 5) X20/X51/X72 缺凭据探测(输出即证据)
 bash probes/probe_blocked_credentials.sh
 ```
