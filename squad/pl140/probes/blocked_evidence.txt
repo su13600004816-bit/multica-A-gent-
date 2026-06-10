@@ -1,0 +1,22 @@
+===== X51 — GitHub ref 真网络校验需 gh PAT =====
+$ which gh && gh --version
+/usr/bin/gh
+gh version 2.93.0 (2026-05-27)
+$ gh auth status
+You are not logged into any GitHub hosts. To log in, run: gh auth login
+证据:gh 二进制就绪,但未登录任何 GitHub host → verify_github_refs(verify_network=True)
+      会因无 token 失败。结论:X51 = BLOCKED(缺 gh PAT,repo.env 标注'待配')。
+
+===== X72 — P0 外部通知通道(Slack/SMS)需 webhook/凭据 =====
+$ env | grep -iE 'SLACK|TWILIO|SMS|WEBHOOK|PAGER'
+(无任何外部通知凭据)
+证据:无外部通知通道凭据 → P0 告警无法外发。脚本侧 ack 账本(p0_ack_entry/
+      pending_p0_acks)已闭环并单测;外发通道 = BLOCKED(需平台 webhook)。
+
+===== X20 — 证据绑定'专属 API 凭据主体'需平台身份系统 =====
+$ env | grep -iE 'API_KEY|CRED_SUBJECT|IDENTITY_TOKEN|MTLS|CLIENT_CERT'
+(无 per-agent 凭据主体/mTLS 客户端证书)
+$ multica --help | grep -iE 'credential|identity|subject|cert'
+(multica CLI 未暴露 credential/identity/subject 子命令)
+证据:无 per-agent 凭据主体,multica 也未暴露身份/凭据子命令 → classify_source
+      只能按声明身份字符串分级,无法防伪造。结论:X20 = BLOCKED(需平台身份系统)。

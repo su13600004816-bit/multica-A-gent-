@@ -1,0 +1,12 @@
+[Unit]
+# X63:看门狗心跳外部监督 —— 进程外 watcher,看门狗 cron/进程自身死掉时它仍能跑,
+# 读 watchdog_heartbeat.json 判停摆,超阈值则落本地告警并以非 0 退出码让外部可感知。
+Description=PL1 watchdog heartbeat watcher (external supervision; fires when watchdog itself is silent)
+
+[Service]
+Type=oneshot
+User=fleet
+Group=fleet
+# 阈值 10 分钟:cron 每 2 分钟一轮,连续 5 轮无成功扫描即判停摆。
+ExecStart=/usr/bin/python3 /home/fleet/line-config/line_partial.py heartbeat-check /home/fleet/line-config/watchdog_heartbeat.json 10
+Nice=5
