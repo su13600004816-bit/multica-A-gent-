@@ -96,7 +96,8 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
     void client.listGraphs().then((names) => {
       if (!alive) return;
       setGraphs(names);
-      if (names.length > 0) void loadGraph(names.includes("lines") ? "lines" : names[0]);
+      const first = names.includes("lines") ? "lines" : names[0];
+      if (first) void loadGraph(first);
     });
     return () => {
       alive = false;
