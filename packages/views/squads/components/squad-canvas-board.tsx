@@ -381,20 +381,23 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
       flowEdge(`wf-e-${i}`, mainIds[i - 1], id, prev.audit ? "✅合格" : undefined, false);
     }
     // 审计/签收 → 返工模块(右,不合格)
-    if (st.audit && byRole.reworkDig && byRole[st.reworkMid ?? "write"]) {
+    const midRole = st.reworkMid ?? "write";
+    const digM = byRole.reworkDig;
+    const midM = byRole[midRole];
+    const audM = byRole.audit;
+    if (st.audit && digM && midM && audM) {
       const digId = `wf-r-${i}-dig`;
       const midId = `wf-r-${i}-mid`;
       const audId = `wf-r-${i}-aud`;
-      const midRole = st.reworkMid ?? "write";
-      mkNode(digId, byRole.reworkDig, "返工深挖(BOM三视角·9层)", WF_REWORK_X, y);
-      mkNode(midId, byRole[midRole], midRole === "write" ? "返工写代码" : "返工代码优化", WF_REWORK_X, y + WF_GAP_Y);
-      mkNode(audId, byRole.audit, "返工审计", WF_REWORK_X, y + WF_GAP_Y * 2);
+      mkNode(digId, digM, "返工深挖(BOM三视角·9层)", WF_REWORK_X, y);
+      mkNode(midId, midM, midRole === "write" ? "返工写代码" : "返工代码优化", WF_REWORK_X, y + WF_GAP_Y);
+      mkNode(audId, audM, "返工审计", WF_REWORK_X, y + WF_GAP_Y * 2);
       flowEdge(`wf-re-${i}-1`, id, digId, "❌不合格", true);
       flowEdge(`wf-re-${i}-2`, digId, midId);
       flowEdge(`wf-re-${i}-3`, midId, audId);
       flowEdge(`wf-re-${i}-back`, audId, digId, "❌不合格 ↺最高9次", true);
       // 返工审计 合格 → 下一主工序
-      if (i + 1 < steps.length) flowEdge(`wf-re-${i}-ok`, audId, mainIds[i] && `wf-m-${i + 1}`, "✅合格", false);
+      if (i + 1 < steps.length) flowEdge(`wf-re-${i}-ok`, audId, `wf-m-${i + 1}`, "✅合格", false);
     }
     y += WF_GAP_Y;
   });
