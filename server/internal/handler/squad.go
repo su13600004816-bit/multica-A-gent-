@@ -919,6 +919,25 @@ func (h *Handler) shouldEnqueueSquadLeaderOnComment(ctx context.Context, issue d
 		return false
 	}
 
+	// Terminal-status gate: a done/cancelled squad issue must NOT have its
+	// leader auto-woken by routine comments. Without this gate any comment on a
+	// terminal squad issue -- most damagingly an automated watchdog/status note
+	// -- wakes the squad leader, which coordinates workers and posts its own
+	// follow-up comments, which wake the leader again: a self-ignition loop.
+	// (Observed in production: a *cancelled* watchdog alert board issue accrued
+	// 555 leader runs at a ~2-minute cadence because every watchdog alert posted
+	// to it re-triggered the squad -- the squad lifecycle was fighting the
+	// task-area lifecycle.) The agent on-comment path is intentionally left open
+	// for human follow-ups on done issues because a single agent wake is cheap
+	// and bounded; a squad wake spins up the whole leader->worker coordination
+	// machine, so it must respect the terminal state. A human who genuinely
+	// needs the squad to act on a terminal issue can still do so explicitly via
+	// an @squad mention (the mention path is deliberately not status-gated) or
+	// by reopening the issue.
+	if issue.Status == "done" || issue.Status == "cancelled" {
+		return false
+	}
+
 	// Load the squad.
 	squad, err := h.Queries.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
 		ID:          issue.AssigneeID,
