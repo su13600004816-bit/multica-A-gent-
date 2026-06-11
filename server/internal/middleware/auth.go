@@ -82,9 +82,22 @@ func Auth(queries *db.Queries, patCache *auth.PATCache, cloudPAT *auth.CloudPATV
 					http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
 					return
 				}
+				boundAgentID := uuidToString(tt.AgentID)
+				boundTaskID := uuidToString(tt.TaskID)
+				if taskTokenHeaderConflict(r, boundAgentID, boundTaskID) {
+					slog.Warn("auth: task token identity header mismatch",
+						"path", r.URL.Path,
+						"bound_agent_id", boundAgentID,
+						"bound_task_id", boundTaskID,
+						"claimed_agent_id", r.Header.Get("X-Agent-ID"),
+						"claimed_task_id", r.Header.Get("X-Task-ID"),
+					)
+					http.Error(w, `{"error":"task token identity mismatch"}`, http.StatusForbidden)
+					return
+				}
 				r.Header.Set("X-User-ID", uuidToString(tt.UserID))
-				r.Header.Set("X-Agent-ID", uuidToString(tt.AgentID))
-				r.Header.Set("X-Task-ID", uuidToString(tt.TaskID))
+				r.Header.Set("X-Agent-ID", boundAgentID)
+				r.Header.Set("X-Task-ID", boundTaskID)
 				r.Header.Set("X-Workspace-ID", uuidToString(tt.WorkspaceID))
 				// X-Actor-Source flags the auth path so resolveActor and
 				// any owner-only handler can deny without re-querying the
@@ -233,6 +246,16 @@ func Auth(queries *db.Queries, patCache *auth.PATCache, cloudPAT *auth.CloudPATV
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func taskTokenHeaderConflict(r *http.Request, boundAgentID, boundTaskID string) bool {
+	if claimed := strings.TrimSpace(r.Header.Get("X-Agent-ID")); claimed != "" && !strings.EqualFold(claimed, boundAgentID) {
+		return true
+	}
+	if claimed := strings.TrimSpace(r.Header.Get("X-Task-ID")); claimed != "" && !strings.EqualFold(claimed, boundTaskID) {
+		return true
+	}
+	return false
 }
 
 // extractToken returns the bearer token and whether it came from a cookie.
