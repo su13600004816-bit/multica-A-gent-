@@ -428,9 +428,11 @@ function SquadCanvasFlow({
   const seedKey = members.map((m) => m.id).join(",");
   const lastSeedKey = useRef<string | null>(null);
   useEffect(() => {
-    if (serverLayout === undefined) return; // 等服务端布局 query settle,优先用它
-    if (lastSeedKey.current === seedKey) return;
-    lastSeedKey.current = seedKey;
+    // 不阻塞节点渲染:seedKey(成员加载)或服务端布局就绪 任一变化都重应用。
+    // 用 sig 同时跟踪两者,避免刷新时服务端 query 慢卡住只剩根节点。
+    const sig = seedKey + "|" + (serverLayout === undefined ? "" : "s");
+    if (lastSeedKey.current === sig) return;
+    lastSeedKey.current = sig;
     let saved: { positions?: Record<string, { x: number; y: number }>; steps?: SquadFlowNode[]; edges?: Edge[] } | null =
       serverLayout && serverLayout.positions ? serverLayout : null;
     if (!saved) {
