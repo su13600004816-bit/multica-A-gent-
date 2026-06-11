@@ -1635,6 +1635,61 @@ func TestIssueSubscriberMutationBody(t *testing.T) {
 	}
 }
 
+func newIssueCommentAddTestCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "add"}
+	cmd.Flags().String("content", "", "")
+	cmd.Flags().Bool("content-stdin", false, "")
+	cmd.Flags().String("content-file", "", "")
+	cmd.Flags().String("parent", "", "")
+	cmd.Flags().StringSlice("attachment", nil, "")
+	cmd.Flags().Bool("no-trigger", false, "")
+	cmd.Flags().String("output", "json", "")
+	return cmd
+}
+
+func TestRunIssueCommentAddNoTriggerBody(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/issues/MUL-1":
+			json.NewEncoder(w).Encode(map[string]any{
+				"id":         "issue-1",
+				"identifier": "MUL-1",
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/issues/issue-1/comments":
+			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			json.NewEncoder(w).Encode(map[string]any{"id": "comment-1"})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	t.Setenv("MULTICA_SERVER_URL", srv.URL)
+	t.Setenv("MULTICA_WORKSPACE_ID", "ws-1")
+	t.Setenv("MULTICA_TOKEN", "test-token")
+
+	cmd := newIssueCommentAddTestCmd()
+	if err := cmd.Flags().Set("content", "visible but quiet"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Flags().Set("no-trigger", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if err := runIssueCommentAdd(cmd, []string{"MUL-1"}); err != nil {
+		t.Fatalf("runIssueCommentAdd: %v", err)
+	}
+
+	if gotBody["content"] != "visible but quiet" {
+		t.Fatalf("content = %v, want visible but quiet", gotBody["content"])
+	}
+	if gotBody["suppress_triggers"] != true {
+		t.Fatalf("suppress_triggers = %v, want true", gotBody["suppress_triggers"])
+	}
+}
+
 // newIssueCommentListTestCmd mirrors the flag set wired in main.init() for
 // the comment list command. We replicate it here so the runIssueCommentList
 // guards can be exercised in isolation — the real command tree pulls in the

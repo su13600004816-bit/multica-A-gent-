@@ -493,7 +493,7 @@ func buildMetaSkillContent(provider string, ctx TaskContextForEnv) string {
 	//     non-UTF-8 codepage (issues #2198 / #2236 / #2376) — which is why
 	//     Windows uses `--content-file`, not stdin.
 	// Because the corruption is shell-driven, the guardrail is provider-agnostic.
-	b.WriteString("- `multica issue comment add <issue-id> [--content \"...\" | --content-stdin | --content-file <path>] [--parent <comment-id>] [--attachment <path>]` — Post a comment. For agent-authored bodies, do NOT inline `--content` — the shell can rewrite backticks, `$()`, quotes, or newlines before the CLI sees them; use the platform-correct non-inline mode shown in ## Comment Formatting below. Run `multica issue comment add --help` for details.\n")
+	b.WriteString("- `multica issue comment add <issue-id> [--content \"...\" | --content-stdin | --content-file <path>] [--parent <comment-id>] [--attachment <path>] [--no-trigger]` — Post a comment. For agent-authored bodies, do NOT inline `--content` — the shell can rewrite backticks, `$()`, quotes, or newlines before the CLI sees them; use the platform-correct non-inline mode shown in ## Comment Formatting below. Use `--no-trigger` for visible status/report comments that must not wake the assignee, squad leader, or mentioned agents. Run `multica issue comment add --help` for details.\n")
 	b.WriteString("- `multica issue metadata list <issue-id> [--output json]` — List every metadata key pinned to an issue. Empty `{}` is normal.\n")
 	b.WriteString("- `multica issue metadata set <issue-id> --key <k> --value <v> [--type string|number|bool]` — Pin (or overwrite) a single metadata key. The CLI auto-infers JSON primitives, so URLs and plain text are stored as strings — pass `--type number` or `--type bool` only when the semantic type matters.\n")
 	b.WriteString("- `multica issue metadata delete <issue-id> --key <k>` — Remove a metadata key.\n\n")
@@ -519,6 +519,9 @@ func buildMetaSkillContent(provider string, ctx TaskContextForEnv) string {
 		b.WriteString("Never use inline `--content` for agent-authored comments: unescaped backticks, `$()`, `$VAR`, or quotes in the body are rewritten by the shell before the CLI receives them. Keep the same `--parent` value from the trigger comment when replying. ")
 		b.WriteString("Do not compress a multi-paragraph answer into one line and do not rely on `\\n` escapes.\n\n")
 	}
+
+	b.WriteString("## No-Trigger Comments\n\n")
+	b.WriteString("Use `multica issue comment add <issue-id> --no-trigger` for visible comments that should not wake another run, including closeout notes, audit sync, watchdog/canary reports, and status-only updates. `/note` remains a compatibility fallback, but the protocol field behind `--no-trigger` is the authoritative suppression path. On squad-assigned issues, do not use personal `mention://agent/...` links for internal squad routing; route through the squad workflow or issue assignment instead.\n\n")
 
 	// Inject available repositories section.
 	if len(ctx.Repos) > 0 {

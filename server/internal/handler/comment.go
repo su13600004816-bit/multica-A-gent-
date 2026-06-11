@@ -768,10 +768,11 @@ func (h *Handler) fetchCommentsForList(ctx context.Context, args fetchCommentsAr
 }
 
 type CreateCommentRequest struct {
-	Content       string   `json:"content"`
-	Type          string   `json:"type"`
-	ParentID      *string  `json:"parent_id"`
-	AttachmentIDs []string `json:"attachment_ids"`
+	Content          string   `json:"content"`
+	Type             string   `json:"type"`
+	ParentID         *string  `json:"parent_id"`
+	AttachmentIDs    []string `json:"attachment_ids"`
+	SuppressTriggers bool     `json:"suppress_triggers"`
 }
 
 func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
@@ -925,7 +926,9 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	// must keep the resolved root in sync.
 	h.TaskService.AutoUnresolveThreadOnReply(r.Context(), rootComment, uuidToString(issue.WorkspaceID), authorType, authorID)
 
-	h.triggerTasksForComment(r.Context(), issue, comment, parentComment, authorType, authorID)
+	if !req.SuppressTriggers {
+		h.triggerTasksForComment(r.Context(), issue, comment, parentComment, authorType, authorID)
+	}
 
 	writeJSON(w, http.StatusCreated, resp)
 }
@@ -1171,6 +1174,9 @@ func (h *Handler) enqueueMentionedAgentTasks(ctx context.Context, issue db.Issue
 			continue
 		}
 		if m.Type != "agent" {
+			continue
+		}
+		if issue.AssigneeType == "squad" && authorType == "agent" {
 			continue
 		}
 		agentUUID := parseUUID(m.ID)

@@ -159,6 +159,7 @@ func buildCommentPrompt(task Task, provider string) string {
 		}
 	}
 	fmt.Fprintf(&b, "Start by running `multica issue get %s --output json` to understand your task, then decide how to proceed.\n\n", task.IssueID)
+	b.WriteString("For visible status, audit sync, watchdog/canary, or closeout comments that should not wake another run, use `multica issue comment add <issue-id> --no-trigger`; `/note` is only a compatibility fallback. Do not use personal `mention://agent/...` links for internal squad routing on squad-assigned issues.\n\n")
 	// Comment-reading pointer. Warm path with new comments: issue-wide
 	// since-delta count, but steer the agent to read the triggering thread
 	// first. Warm resumed path with no new comments: the trigger is already

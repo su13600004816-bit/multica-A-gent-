@@ -349,6 +349,119 @@ func TestCreateComment_SquadLeaderSkipOnlyInspectsCurrentMention(t *testing.T) {
 	}
 }
 
+func TestCreateComment_SuppressTriggersSkipsAllCommentTaskPaths(t *testing.T) {
+	if testHandler == nil || testPool == nil {
+		t.Skip("database not available")
+	}
+	ctx := context.Background()
+	fx := newSquadCommentTriggerFixture(t)
+	squadIssueID := uuidToString(fx.Issue.ID)
+
+	var agentIssueID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO issue (workspace_id, creator_type, creator_id, title, assignee_type, assignee_id)
+		VALUES ($1, 'member', $2, 'no-trigger agent issue', 'agent', $3)
+		RETURNING id
+	`, testWorkspaceID, testUserID, fx.LeaderID).Scan(&agentIssueID); err != nil {
+		t.Fatalf("create agent issue: %v", err)
+	}
+
+	t.Cleanup(func() {
+		testPool.Exec(context.Background(), `DELETE FROM agent_task_queue WHERE issue_id = $1 OR issue_id = $2`, squadIssueID, agentIssueID)
+		testPool.Exec(context.Background(), `DELETE FROM comment WHERE issue_id = $1 OR issue_id = $2`, squadIssueID, agentIssueID)
+		testPool.Exec(context.Background(), `DELETE FROM issue WHERE id = $1`, agentIssueID)
+	})
+
+	postMemberComment := func(issueID string, body map[string]any) {
+		t.Helper()
+		w := httptest.NewRecorder()
+		r := newRequest("POST", "/api/issues/"+issueID+"/comments", body)
+		r = withURLParam(r, "id", issueID)
+		testHandler.CreateComment(w, r)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("CreateComment: expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+	}
+
+	countTasks := func(issueID string) int {
+		t.Helper()
+		var n int
+		if err := testPool.QueryRow(ctx,
+			`SELECT count(*) FROM agent_task_queue WHERE issue_id = $1`,
+			issueID,
+		).Scan(&n); err != nil {
+			t.Fatalf("count tasks for issue %s: %v", issueID, err)
+		}
+		return n
+	}
+
+	postMemberComment(agentIssueID, map[string]any{
+		"content":           "assignee should stay asleep; cc [@Other](mention://agent/" + fx.OtherID + ")",
+		"suppress_triggers": true,
+	})
+	if got := countTasks(agentIssueID); got != 0 {
+		t.Fatalf("agent issue with suppress_triggers: expected 0 tasks, got %d", got)
+	}
+
+	postMemberComment(squadIssueID, map[string]any{
+		"content":           "status-only report for the squad leader",
+		"suppress_triggers": true,
+	})
+	if got := countTasks(squadIssueID); got != 0 {
+		t.Fatalf("squad issue with suppress_triggers: expected 0 tasks, got %d", got)
+	}
+}
+
+func TestCreateComment_SquadIssueAgentMentionBlocksPersonalAgentTask(t *testing.T) {
+	if testHandler == nil || testPool == nil {
+		t.Skip("database not available")
+	}
+	ctx := context.Background()
+	fx := newSquadCommentTriggerFixture(t)
+	issueID := uuidToString(fx.Issue.ID)
+
+	t.Cleanup(func() {
+		testPool.Exec(context.Background(), `DELETE FROM agent_task_queue WHERE issue_id = $1`, issueID)
+		testPool.Exec(context.Background(), `DELETE FROM comment WHERE issue_id = $1`, issueID)
+	})
+
+	var runtimeID string
+	if err := testPool.QueryRow(ctx, `SELECT runtime_id FROM agent WHERE id = $1`, fx.LeaderID).Scan(&runtimeID); err != nil {
+		t.Fatalf("load runtime: %v", err)
+	}
+	var workerTaskID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO agent_task_queue (agent_id, runtime_id, issue_id, status, is_leader_task)
+		VALUES ($1, $2, $3, 'running', FALSE)
+		RETURNING id
+	`, fx.LeaderID, runtimeID, issueID).Scan(&workerTaskID); err != nil {
+		t.Fatalf("seed worker task: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	r := newRequest("POST", "/api/issues/"+issueID+"/comments", map[string]any{
+		"content": "delegating internally to [@Other](mention://agent/" + fx.OtherID + ")",
+	})
+	r.Header.Set("X-Agent-ID", fx.LeaderID)
+	r.Header.Set("X-Task-ID", workerTaskID)
+	r = withURLParam(r, "id", issueID)
+	testHandler.CreateComment(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateComment: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var mentionedTasks int
+	if err := testPool.QueryRow(ctx, `
+		SELECT count(*) FROM agent_task_queue
+		WHERE issue_id = $1 AND agent_id = $2 AND trigger_comment_id IS NOT NULL
+	`, issueID, fx.OtherID).Scan(&mentionedTasks); err != nil {
+		t.Fatalf("count mentioned tasks: %v", err)
+	}
+	if mentionedTasks != 0 {
+		t.Fatalf("squad issue agent-authored @agent mention: expected 0 personal tasks, got %d", mentionedTasks)
+	}
+}
+
 // TestCreateComment_DualRoleAgentWorkerCommentWakesLeader is the full-stack
 // regression test for MUL-2218. Scenario:
 //

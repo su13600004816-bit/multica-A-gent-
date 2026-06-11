@@ -352,6 +352,7 @@ func init() {
 	issueCommentAddCmd.Flags().String("content-file", "", "Read comment content from a UTF-8 file (preserves multi-line content verbatim; use this on Windows when stdin piping mangles non-ASCII bytes)")
 	issueCommentAddCmd.Flags().String("parent", "", "Parent comment ID (reply to a specific comment)")
 	issueCommentAddCmd.Flags().StringSlice("attachment", nil, "File path(s) to attach (can be specified multiple times)")
+	issueCommentAddCmd.Flags().Bool("no-trigger", false, "Post a visible comment without triggering assignee, squad leader, or mentioned-agent tasks")
 	issueCommentAddCmd.Flags().String("output", "json", "Output format: table or json")
 
 	// issue search
@@ -1205,6 +1206,9 @@ func runIssueCommentAdd(cmd *cobra.Command, args []string) error {
 	body := map[string]any{"content": content}
 	if parentID, _ := cmd.Flags().GetString("parent"); parentID != "" {
 		body["parent_id"] = parentID
+	}
+	if noTrigger, _ := cmd.Flags().GetBool("no-trigger"); noTrigger {
+		body["suppress_triggers"] = true
 	}
 	if len(attachmentIDs) > 0 {
 		body["attachment_ids"] = attachmentIDs

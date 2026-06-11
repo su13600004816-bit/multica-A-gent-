@@ -59,6 +59,24 @@ func TestSubIssueCreationSectionPresentForIssueRuns(t *testing.T) {
 	}
 }
 
+func TestBriefDocumentsNoTriggerComments(t *testing.T) {
+	t.Parallel()
+	out := buildMetaSkillContent("claude", TaskContextForEnv{IssueID: "11111111-2222-3333-4444-555555555555"})
+
+	for _, want := range []string{
+		"[--no-trigger]",
+		"## No-Trigger Comments",
+		"`multica issue comment add <issue-id> --no-trigger`",
+		"must not wake the assignee, squad leader, or mentioned agents",
+		"`/note` remains a compatibility fallback",
+		"do not use personal `mention://agent/...` links for internal squad routing",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("runtime brief missing no-trigger guidance %q\n---\n%s", want, out)
+		}
+	}
+}
+
 // The brief must no longer carry any parent-notification guidance. PR
 // #2918 added a "Tell the parent when you finish a child" rule that
 // turned into noise (self-mention loops, planner ack ping-pong,
