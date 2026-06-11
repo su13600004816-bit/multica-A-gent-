@@ -508,6 +508,24 @@ func (s *TaskService) EnqueueTaskForMention(ctx context.Context, issue db.Issue,
 // as a worker (do not skip). This matters for agents that are simultaneously
 // the leader and a worker of the same squad — see migration 090.
 func (s *TaskService) EnqueueTaskForSquadLeader(ctx context.Context, issue db.Issue, leaderID pgtype.UUID, triggerCommentID pgtype.UUID) (db.AgentTaskQueue, error) {
+	// Authoritative task-area lifecycle invariant -- the single squad-leader
+	// enqueue chokepoint. A squad leader is NEVER enqueued for an issue whose
+	// lifecycle has ended (done/cancelled). Every squad-leader trigger funnels
+	// through here (on-comment, on-assign, @squad mention, child-done,
+	// autopilot, issue-create), so enforcing the rule once -- instead of in
+	// each caller -- makes squad self-ignition on a terminal issue structurally
+	// impossible regardless of which path fires or which paths are added later.
+	// To act on a terminal issue, reopen it first (status -> todo/in_progress);
+	// that transition is the deliberate signal. Returned as a silent no-op (nil
+	// error): every caller discards the task and only branches on error, so a
+	// terminal skip must not surface as a warning on each watchdog status note.
+	// (Guarded here and not in the shared enqueueMentionTask so the deliberate
+	// plain @agent-mention-on-done-issue follow-up still works.)
+	if issue.Status == "done" || issue.Status == "cancelled" {
+		slog.Debug("squad-leader enqueue skipped: issue is terminal",
+			"issue_id", util.UUIDToString(issue.ID), "status", issue.Status)
+		return db.AgentTaskQueue{}, nil
+	}
 	return s.enqueueMentionTask(ctx, issue, leaderID, triggerCommentID, true, false)
 }
 
