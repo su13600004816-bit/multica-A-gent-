@@ -25,12 +25,21 @@ const (
 	otherAgentID    = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 	memberID        = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 	otherMemberID   = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+	squadAssigneeID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+	otherSquadID    = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 )
 
 func issueWithAgentAssignee() db.Issue {
 	return db.Issue{
 		AssigneeType: testText("agent"),
 		AssigneeID:   testUUID(agentAssigneeID),
+	}
+}
+
+func issueWithSquadAssignee() db.Issue {
+	return db.Issue{
+		AssigneeType: testText("squad"),
+		AssigneeID:   testUUID(squadAssigneeID),
 	}
 }
 
@@ -403,4 +412,91 @@ func TestTriggerTasksForComment_SuppressFalseReachesEnqueue(t *testing.T) {
 	}
 
 	h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID, false)
+}
+
+// -------------------------------------------------------------------
+// suppress_triggers gates the squad-leader wake paths (DB-free)
+// -------------------------------------------------------------------
+//
+// These two tests are the Postgres-free equivalents of the assertions in
+// squad_comment_trigger_test.go's TestCreateComment_SuppressTriggersBlocksSquadLeader.
+// That handler test exercises the real EnqueueTaskForSquadLeader against a
+// live queue, so it SKIPS when no database is reachable — which means a
+// reviewer without Postgres never actually runs the squad-leader assertion.
+// The tests below close that gap: they drive the same chokepoint
+// (triggerTasksForComment) with a nil-Queries Handler so they run and assert
+// in any environment, no database required.
+//
+// Mechanism (same idiom as TestTriggerTasksForComment_SuppressFalseReachesEnqueue):
+// with h.Queries nil, the first code path that touches the DB panics. The
+// suppress=true case must return at the chokepoint BEFORE that path (no
+// panic); the suppress=false control must reach it (panic). The panic is thus
+// a positive proof that, without suppression, the squad-leader wake path is
+// reached — and that suppress_triggers is exactly what prevents it.
+
+// TestTriggerTasksForComment_SuppressGatesSquadLeaderOnComment is the DB-free
+// equivalent of the "plain member comment" scenario. On a squad-assigned
+// issue with a plain member comment:
+//
+//   - shouldEnqueueOnComment returns false WITHOUT a DB call (issue is not
+//     agent-assigned), so the && short-circuits before any panic.
+//   - shouldEnqueueSquadLeaderOnComment is the FIRST path to dereference
+//     h.Queries (GetSquadInWorkspace) — the on-comment squad-leader wake.
+//
+// suppress=true must short-circuit before it (no panic); suppress=false must
+// reach it (panic), proving suppression alone gates the squad-leader wake.
+func TestTriggerTasksForComment_SuppressGatesSquadLeaderOnComment(t *testing.T) {
+	issue := issueWithSquadAssignee()
+	comment := db.Comment{Content: "what is the latest on this?"}
+
+	t.Run("suppress=true short-circuits before the squad-leader path", func(t *testing.T) {
+		h := &Handler{} // nil Queries on purpose
+		// Must NOT panic: the suppress guard returns before
+		// shouldEnqueueSquadLeaderOnComment touches the nil Queries.
+		h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID, true)
+	})
+
+	t.Run("suppress=false reaches the squad-leader path", func(t *testing.T) {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("expected panic: a plain member comment on a squad-assigned issue with suppress=false must reach the squad-leader wake (shouldEnqueueSquadLeaderOnComment → GetSquadInWorkspace)")
+			}
+		}()
+		h := &Handler{} // nil Queries on purpose
+		h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID, false)
+	})
+}
+
+// TestTriggerTasksForComment_SuppressGatesSquadMentionWake is the DB-free
+// equivalent of the "mention://squad" scenario. The comment @mentions a
+// squad, which routes to that squad's leader via enqueueMentionedAgentTasks.
+// The issue itself is left UNASSIGNED so the earlier on-comment paths
+// (shouldEnqueueOnComment, shouldEnqueueSquadLeaderOnComment) both return
+// false without a DB call, isolating the @squad mention branch as the first —
+// and only — path that dereferences h.Queries (GetSquadInWorkspace).
+//
+// suppress=true must short-circuit before it (no panic); suppress=false must
+// reach it (panic), proving suppression gates the @squad mention wake too.
+func TestTriggerTasksForComment_SuppressGatesSquadMentionWake(t *testing.T) {
+	issue := issueNoAssignee()
+	comment := db.Comment{
+		Content: fmt.Sprintf("handing to [@Squad](mention://squad/%s)", otherSquadID),
+	}
+
+	t.Run("suppress=true short-circuits before the @squad mention path", func(t *testing.T) {
+		h := &Handler{} // nil Queries on purpose
+		// Must NOT panic: the suppress guard returns before
+		// enqueueMentionedAgentTasks resolves the @squad mention.
+		h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID, true)
+	})
+
+	t.Run("suppress=false reaches the @squad mention path", func(t *testing.T) {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("expected panic: a @squad-mention comment with suppress=false must reach the squad-leader wake (enqueueMentionedAgentTasks → GetSquadInWorkspace)")
+			}
+		}()
+		h := &Handler{} // nil Queries on purpose
+		h.triggerTasksForComment(context.Background(), issue, comment, nil, "member", memberID, false)
+	})
 }
