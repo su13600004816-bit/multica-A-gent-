@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import type { ApiClient } from "../api/client";
 import type { Attachment } from "../types";
 import { MAX_FILE_SIZE } from "../constants/upload";
-import { compressImage } from "../image-compress";
+import { compressImage, isImageFile } from "../image-compress";
 
 // Carries the full Attachment so editors that need preview metadata
 // (`content_type`, `download_url`) get it directly; `link` is kept as an
@@ -33,10 +33,15 @@ export function useFileUpload(
       setUploading(true);
       try {
         let toUpload = file;
-      if (file.type.startsWith("image/")) {
-        try { const result = await compressImage(file); toUpload = result.file; } catch { toUpload = file; }
-      }
-      const att: Attachment = await api.uploadFile(toUpload, {
+        if (isImageFile(file)) {
+          try {
+            const result = await compressImage(file);
+            toUpload = result.file;
+          } catch {
+            toUpload = file;
+          }
+        }
+        const att: Attachment = await api.uploadFile(toUpload, {
           issueId: ctx?.issueId,
           commentId: ctx?.commentId,
           chatSessionId: ctx?.chatSessionId,
