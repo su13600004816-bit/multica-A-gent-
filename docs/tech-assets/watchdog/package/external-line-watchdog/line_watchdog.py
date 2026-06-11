@@ -24,7 +24,7 @@
 #   WATCHDOG_STATE=<json路径>        覆盖去重状态文件(自测隔离,默认 watchdog_state.json)
 #   WATCHDOG_DRY_RUN=1               comment() 只打印不真发(不触发任何 agent/不贴台)
 import re
-import subprocess, json, sys, os, argparse
+import subprocess, json, sys, os, argparse, time
 import fcntl
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -37,6 +37,11 @@ HANDOFF = "bc056ade-f639-41af-b5df-9c7fb6a27628"  # PL-94 看门狗告警台
 STATE_F = os.environ.get("WATCHDOG_STATE", "/home/fleet/line-config/watchdog_state.json")
 STATE_BAK_F = os.environ.get("WATCHDOG_STATE_BAK", STATE_F + ".bak")  # U54 损坏恢复备份
 SCRIPT_LOCK_F = os.environ.get("WATCHDOG_SCRIPT_LOCK", "/home/fleet/line-config/watchdog-script.lock")
+# 自燃收敛(总管 2026-06-11):同一 issue 窗口内自动分流次数封顶。病根=blocked/in_progress 下 run
+# 反复 cancelled-empty -> streak++ -> sig 变绕过退避每轮重派,route 又 confirmed(新run起)pop退避 -> 永不收敛
+# (PL-157 式 🚨 刷屏自燃)。治=按 ident 统计窗口内分流次数,超 CAP 停自动分流+升级一次+静默,churn 停自动复位。
+SELFIGNITION_ROUTE_CAP = int(os.environ.get("WATCHDOG_SELFIGN_CAP", "3"))
+SELFIGNITION_WINDOW_MIN = float(os.environ.get("WATCHDOG_SELFIGN_WINDOW_MIN", "30"))
 # PL-132:仅在 --post 真实运行时才回写 latest_valid_evidence_* metadata(离线/只读巡查不写台)。
 WRITE_METADATA = False
 # PL-137:本轮是否处于停用(只读)态 + 原因,供 emit_observability 写进状态板/心跳的 disabled 签名。
@@ -248,6 +253,8 @@ def load_state():
             "metrics": list(d.get("metrics", [])),
             "closed_loop": list(d.get("closed_loop", [])),
             "route_retry": dict(d.get("route_retry", {})),
+            "route_history": dict(d.get("route_history", {})),   # 自燃收敛:每 ident 近期分流时戳(epoch)
+            "selfign_silenced": dict(d.get("selfign_silenced", {})),  # 自燃收敛:已升级静默的 ident
             "stage_state": dict(d.get("stage_state", {})),  # U22:role-stage 状态字段
             "status_hist": dict(d.get("status_hist", {})),  # X35:每 issue 上一轮状态
             "leader_map": dict(d.get("leader_map", {}))}    # X26:上一轮 leader 映射
@@ -261,6 +268,8 @@ def save_state(st):
                 "metrics": st.get("metrics", [])[-O_METRICS_CAP:],
                 "closed_loop": st.get("closed_loop", [])[-O_CLOSEDLOOP_CAP:],
                 "route_retry": st.get("route_retry", {}),
+                "route_history": st.get("route_history", {}),
+                "selfign_silenced": st.get("selfign_silenced", {}),
                 "stage_state": st.get("stage_state", {}),  # U22:role-stage 状态字段
                 "status_hist": st.get("status_hist", {}),  # X35:每 issue 上一轮状态
                 "leader_map": st.get("leader_map", {})}    # X26:上一轮 leader 映射
@@ -856,6 +865,31 @@ def alert_sig(al):
     但经过时长/时间戳每轮必变且无意义,先归一化掉,避免 sig 漂移导致刷屏。"""
     why = _SIG_VOLATILE_RE.sub("#", al.get("why", ""))
     return "%s::%s" % (why, al.get("streak", ""))
+
+def converge_selfignition(candidates, st):
+    """自燃收敛:按 issue ident 统计 SELFIGNITION_WINDOW_MIN 窗口内自动分流次数,
+    超 SELFIGNITION_ROUTE_CAP 则本轮不再分流该 issue(capped),交由调用方升级一次+静默。
+    记录点合并在此(将要分流即计一次);churn 停 -> 窗口外计数归零 -> 自动允许(复位静默)。
+    返回 (allowed, capped)。"""
+    hist = st.setdefault("route_history", {})
+    silenced = st.setdefault("selfign_silenced", {})
+    now = time.time(); win = SELFIGNITION_WINDOW_MIN * 60.0
+    allowed, capped = [], []
+    for al in candidates:
+        ident = al.get("ident") or al.get("iid") or ""
+        ts_list = [t for t in hist.get(ident, []) if isinstance(t, (int, float)) and (now - t) <= win]
+        if len(ts_list) >= SELFIGNITION_ROUTE_CAP:
+            hist[ident] = ts_list
+            capped.append(al)
+        else:
+            ts_list.append(now)
+            hist[ident] = ts_list
+            silenced.pop(ident, None)
+            allowed.append(al)
+    for k in [k for k, v in list(hist.items()) if not v]:
+        hist.pop(k, None); silenced.pop(k, None)
+    return allowed, capped
+
 
 def dedup_changed(alerts, prev_sigs, route_retry, now):
     """BOM-7 + B-PL142:计算本轮需要贴台/分流的 changed 告警 + 新签名表。
@@ -2070,6 +2104,15 @@ def main():
         if canary_held:
             print("CANARY_HOLD 灰度放量 %.0f%%:本轮 %d 条告警只贴台不续派(等放量)" % (
                 a.canary_route_pct, canary_held))
+        route_candidates, _selfign_capped = converge_selfignition(route_candidates, st)
+        for _al in _selfign_capped:
+            _ident = _al.get("ident") or _al.get("iid") or ""
+            if _ident not in st.setdefault("selfign_silenced", {}):
+                st["selfign_silenced"][_ident] = time.time()
+                comment(HANDOFF, "🛑 **自燃收敛**:%s 在 %.0f 分钟内已自动分流≥%d 次仍在 churn(run 反复取消/空转);暂停对它的自动分流,转总管/人工介入。churn 停后自动复位。" % (_ident, SELFIGNITION_WINDOW_MIN, SELFIGNITION_ROUTE_CAP))
+                print("SELFIGN_CAPPED %s -> 暂停自动分流(升级人工一次)" % _ident)
+            else:
+                print("SELFIGN_SILENCED %s (本轮压住,不重派)" % _ident)
         jobs = build_route_jobs(route_candidates)
         results = run_route_jobs(jobs, a.route_workers, a.route_timeout)
         route_results = results  # U51:供 cycle ledger 记 routed_ok/routed_fail
