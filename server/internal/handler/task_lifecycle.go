@@ -124,6 +124,17 @@ func (h *Handler) RerunIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A cancelled issue is terminal/abandoned: re-running it re-enqueues a
+	// (leader) task and, for a squad-assigned issue, reignites the squad
+	// coordination machine -- the escalation door the watchdog's
+	// route_to_squad path would otherwise use to bypass the on-comment gate.
+	// Cancelled means stop; the caller must reopen (status -> in_progress)
+	// first. (done is intentionally still rerunnable -- a deliberate redo.)
+	if issue.Status == "cancelled" {
+		writeError(w, http.StatusBadRequest, "cannot rerun a cancelled issue; reopen it (set status to in_progress) first")
+		return
+	}
+
 	// Body is optional. A zero-length body or `{}` keeps the legacy
 	// assignee-driven rerun behaviour the CLI relies on.
 	var req RerunIssueRequest

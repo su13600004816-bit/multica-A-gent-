@@ -1030,6 +1030,15 @@ func (h *Handler) shouldEnqueueSquadLeaderOnAssign(ctx context.Context, issue db
 	if issue.Status == "backlog" {
 		return false
 	}
+	// Terminal issues never auto-execute on (re)assignment -- same invariant
+	// as the on-comment gate (see shouldEnqueueSquadLeaderOnComment). Without
+	// this an automated re-assign of a done/cancelled squad issue would
+	// re-wake the leader: the second door of the watchdog self-ignition loop.
+	// An explicit @squad mention (not status-gated) remains the way to act on
+	// a terminal issue on purpose.
+	if issue.Status == "done" || issue.Status == "cancelled" {
+		return false
+	}
 	if h.actorIsSquadLeader(ctx, issue, actorType, actorID) {
 		return false
 	}
