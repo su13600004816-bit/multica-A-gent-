@@ -319,8 +319,14 @@ function wfRoleOf(s: string): string | null {
   return null;
 }
 
-const HFLOW: Array<{ role: string; label: string; audit?: boolean; reworkMid?: string }> = [
-  { role: "leader", label: "主线·任务推进" },
+const HUBROW: Array<{ role: string; label: string }> = [
+  { role: "leader", label: "主线主脑·线长" },
+  { role: "crisis", label: "危机处理主脑" },
+  { role: "problem", label: "问题收集主脑" },
+  { role: "memory", label: "记忆大师主脑" },
+  { role: "watchdog", label: "看门狗主脑" },
+];
+const FLOW: Array<{ role: string; label: string; audit?: boolean; reworkMid?: string }> = [
   { role: "write", label: "写代码" },
   { role: "audit", label: "审计 ①", audit: true, reworkMid: "write" },
   { role: "codeDig", label: "代码深挖" },
@@ -329,15 +335,20 @@ const HFLOW: Array<{ role: string; label: string; audit?: boolean; reworkMid?: s
   { role: "shotVerify", label: "截图认证" },
   { role: "vmVerify", label: "虚拟机认证" },
   { role: "humanVerify", label: "拟人认证" },
-  { role: "leader", label: "主线签收", audit: true, reworkMid: "optimize" },
-];
-const TAIL: Array<{ role: string; label: string }> = [
   { role: "push", label: "PR 推送(github/谷歌)" },
-  { role: "crisis", label: "危机签收" },
-  { role: "problem", label: "问题签收" },
-  { role: "memory", label: "记忆储存·清除" },
-  { role: "watchdog", label: "看门狗收口·停止 ⏹" },
 ];
+const SUPS: Array<{ key: string; label: string }> = [
+  { key: "task", label: "B7 任务派发主管" },
+  { key: "audit", label: "B1 审计主管" },
+  { key: "crisis", label: "B2 危机主管" },
+  { key: "memory", label: "B3 记忆主管" },
+  { key: "code", label: "B4 代码主管" },
+  { key: "problem", label: "B6 问题主管" },
+];
+const SUP_OF: Record<string, string> = {
+  leader: "task", audit: "audit", crisis: "crisis", watchdog: "crisis",
+  memory: "memory", optimize: "code", codeDig: "code", write: "code", problem: "problem",
+};
 
 type WfDeps = {
   members: SquadMember[];
@@ -357,68 +368,59 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
 
   const nodes: SquadFlowNode[] = [];
   const edges: Edge[] = [];
-  // 主脑互通连线:虚线浅灰,走底部把手,区别于工作流主线。
-  const hubEdge = (id: string, src: string, tgt: string): void => {
-    edges.push({
-      id,
-      source: src,
-      target: tgt,
-      sourceHandle: "bs",
-      targetHandle: "bt",
-      animated: false,
-      style: { stroke: "#94a3b8", strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.4 },
-    } as Edge);
-  };
   const mkNode = (id: string, m: SquadMember, label: string, x: number, y: number): void => {
     nodes.push({
-      id,
-      type: "squadMember",
-      position: { x, y },
+      id, type: "squadMember", position: { x, y },
       data: {
-        name: d.nameOf(m),
-        memberType: m.member_type,
-        memberId: m.member_id,
-        role: label,
+        name: d.nameOf(m), memberType: m.member_type, memberId: m.member_id, role: label,
         isLeader: m.member_type === "agent" && m.member_id === d.leaderId,
-        leaderLabel: d.leaderLabel,
-        status: d.statusOf(m.id),
+        leaderLabel: d.leaderLabel, status: d.statusOf(m.id),
       },
     } as SquadMemberNode);
   };
+  const mkBox = (id: string, label: string, x: number, y: number): void => {
+    nodes.push({ id, type: "flowStep", position: { x, y }, data: { label } } as FlowStepNode);
+  };
   const edge = (
-    id: string,
-    src: string,
-    tgt: string,
-    sh: string,
-    th: string,
-    label?: string,
-    bad?: boolean,
+    id: string, src: string, tgt: string, sh: string, th: string,
+    label?: string, color?: string, dash?: string,
   ): void => {
     edges.push({
-      id,
-      source: src,
-      target: tgt,
-      sourceHandle: sh,
-      targetHandle: th,
-      label,
-      animated: false,
-      style: { stroke: bad ? "#ef4444" : "#22c55e", strokeWidth: 1.5 },
-      labelStyle: { fill: bad ? "#ef4444" : "#16a34a", fontSize: 11, fontWeight: 600 },
+      id, source: src, target: tgt, sourceHandle: sh, targetHandle: th, label, animated: false,
+      style: { stroke: color ?? "#22c55e", strokeWidth: 1.5, ...(dash ? { strokeDasharray: dash } : {}) },
+      labelStyle: { fill: color ?? "#16a34a", fontSize: 11, fontWeight: 600 },
       labelBgStyle: { fill: "var(--background)", fillOpacity: 0.9 },
     } as Edge);
   };
 
-  const mainSeq = HFLOW.filter((st) => byRole[st.role]);
-  let lastX = 0;
-  mainSeq.forEach((st, i) => {
+  const HX = 250;
+  const Y_BOSS = -470;
+  const Y_SUP = -320;
+  const Y_HUB = -150;
+  const Y_FLOW = 60;
+  const Y_REWORK = 250;
+
+  // 主脑簇(顶部一排)
+  const hubRoles = HUBROW.filter((h) => byRole[h.role]);
+  const hubNodeId: Record<string, string> = {};
+  hubRoles.forEach((h, i) => {
+    const m = byRole[h.role];
+    if (!m) return;
+    const id = `wf-hub-${h.role}`;
+    mkNode(id, m, h.label, i * HX, Y_HUB);
+    hubNodeId[h.role] = id;
+  });
+
+  // 横向工作流
+  const flowSeq = FLOW.filter((st) => byRole[st.role]);
+  flowSeq.forEach((st, i) => {
     const m = byRole[st.role];
     if (!m) return;
-    const x = i * WF_HX;
-    lastX = x;
-    mkNode(`wf-m-${i}`, m, st.label, x, 0);
+    const x = i * HX;
+    mkNode(`wf-m-${i}`, m, st.label, x, Y_FLOW);
     if (i > 0) {
-      const prev = mainSeq[i - 1];
-      edge(`wf-e-${i}`, `wf-m-${i - 1}`, `wf-m-${i}`, "rs", "lt", prev?.audit ? "✅合格" : undefined, false);
+      const prev = flowSeq[i - 1];
+      edge(`wf-e-${i}`, `wf-m-${i - 1}`, `wf-m-${i}`, "rs", "lt", prev?.audit ? "✅合格" : undefined, "#22c55e");
     }
     const midRole = st.reworkMid ?? "write";
     const digM = byRole.reworkDig;
@@ -428,51 +430,61 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
       const digId = `wf-r-${i}-dig`;
       const midId = `wf-r-${i}-mid`;
       const audId = `wf-r-${i}-aud`;
-      mkNode(digId, digM, "返工深挖(BOM三视角·9层)", x, WF_ROW_Y);
-      mkNode(midId, midM, midRole === "write" ? "返工写代码" : "返工代码优化", x + WF_HX, WF_ROW_Y);
-      mkNode(audId, audM, "返工审计", x + WF_HX * 2, WF_ROW_Y);
-      edge(`wf-re-${i}-1`, `wf-m-${i}`, digId, "ts", "bt", "❌不合格", true);
-      edge(`wf-re-${i}-2`, digId, midId, "rs", "lt");
-      edge(`wf-re-${i}-3`, midId, audId, "rs", "lt");
-      edge(`wf-re-${i}-back`, audId, digId, "ts", "tt", "❌不合格·重走流程", true);
-      if (i + 1 < mainSeq.length) {
-        edge(`wf-re-${i}-ok`, audId, `wf-m-${i + 1}`, "bs", "tt", "✅合格", false);
+      mkNode(digId, digM, "返工深挖(BOM·9层)", x, Y_REWORK);
+      mkNode(midId, midM, midRole === "write" ? "返工写代码" : "返工代码优化", x + HX, Y_REWORK);
+      mkNode(audId, audM, "返工审计", x + HX * 2, Y_REWORK);
+      edge(`wf-re-${i}-1`, `wf-m-${i}`, digId, "bs", "tt", "❌不合格", "#ef4444");
+      edge(`wf-re-${i}-2`, digId, midId, "rs", "lt", undefined, "#ef4444");
+      edge(`wf-re-${i}-3`, midId, audId, "rs", "lt", undefined, "#ef4444");
+      edge(`wf-re-${i}-back`, audId, digId, "bs", "bt", "❌重走·9次", "#ef4444");
+      if (i + 1 < flowSeq.length) {
+        edge(`wf-re-${i}-ok`, audId, `wf-m-${i + 1}`, "ts", "bt", "✅合格", "#22c55e");
       }
     }
   });
-
-  const tailSeq = TAIL.filter((st) => byRole[st.role]);
-  let prevTail = `wf-m-${mainSeq.length - 1}`;
-  tailSeq.forEach((st, j) => {
-    const m = byRole[st.role];
-    if (!m) return;
-    const id = `wf-t-${j}`;
-    mkNode(id, m, st.label, lastX, (j + 1) * WF_VY);
-    edge(`wf-te-${j}`, prevTail, id, "bs", "tt", j === 0 ? "✅合格" : undefined, false);
-    prevTail = id;
-  });
-
-  // 主脑互通:主线主脑/危机/问题/记忆/看门狗 跟全员连线(管全队)。
-  // 按 member_id 去重 → 每个唯一成员(含只在返工里出现的返工深挖)一个代表节点,绝不漏。
-  const uniqueMembers = new Map<string, string>();
-  for (const n of nodes) {
-    const mid = (n.data as MemberNodeData).memberId;
-    if (mid && !uniqueMembers.has(mid)) uniqueMembers.set(mid, n.id);
+  if (hubNodeId.leader && flowSeq.length > 0) {
+    edge("wf-start", hubNodeId.leader, "wf-m-0", "bs", "tt", "派发", "#22c55e");
   }
-  const HUB_ROLES = ["leader", "crisis", "problem", "memory", "watchdog"];
-  const hubMids = new Set(
-    HUB_ROLES.map((r) => byRole[r]?.member_id).filter((x): x is string => !!x),
-  );
-  for (const hubRole of HUB_ROLES) {
-    const hubM = byRole[hubRole];
-    if (!hubM) continue;
-    const hubId = uniqueMembers.get(hubM.member_id);
-    if (!hubId) continue;
-    for (const [mid, nodeId] of uniqueMembers) {
-      if (mid === hubM.member_id) continue;
-      // 主脑之间只连一次(member_id 小的发起)
-      if (hubMids.has(mid) && mid < hubM.member_id) continue;
-      hubEdge(`wf-hub-${hubRole}-${nodeId}`, hubId, nodeId);
+
+  // 经理 + 主管
+  mkBox("wf-boss-a1", "A1 cc 统筹经理", 1 * HX, Y_BOSS);
+  mkBox("wf-boss-a2", "A2 cx 统筹副经理", 2 * HX, Y_BOSS);
+  edge("wf-mgr-a", "wf-boss-a2", "wf-boss-a1", "ts", "bs", undefined, "#a855f7", "5 4");
+  const supId: Record<string, string> = {};
+  SUPS.forEach((sp, i) => {
+    const id = `wf-sup-${sp.key}`;
+    mkBox(id, sp.label, i * HX, Y_SUP);
+    supId[sp.key] = id;
+    edge(`wf-supup-${sp.key}`, id, "wf-boss-a2", "ts", "bs", undefined, "#a855f7", "5 4");
+  });
+  for (const h of hubRoles) {
+    const sk = SUP_OF[h.role];
+    const hid = hubNodeId[h.role];
+    const sid = sk ? supId[sk] : undefined;
+    if (sid && hid) {
+      edge(`wf-rep-${h.role}`, hid, sid, "ts", "bs", "汇报", "#a855f7", "5 4");
+    }
+  }
+
+  // 主脑互通:每个主脑 → 全工作流唯一成员(去重,不漏)
+  const uniq = new Map<string, string>();
+  for (const n of nodes) {
+    if (n.type !== "squadMember") continue;
+    const mid = (n.data as MemberNodeData).memberId;
+    if (mid && !uniq.has(mid)) uniq.set(mid, n.id);
+  }
+  const hubIdSet = new Set(Object.values(hubNodeId));
+  for (const h of hubRoles) {
+    const hubM = byRole[h.role];
+    const hid = hubNodeId[h.role];
+    if (!hubM || !hid) continue;
+    for (const [mid, nodeId] of uniq) {
+      if (mid === hubM.member_id || hubIdSet.has(nodeId)) continue;
+      edges.push({
+        id: `wf-link-${h.role}-${nodeId}`, source: hid, target: nodeId,
+        sourceHandle: "bs", targetHandle: "tt", animated: false,
+        style: { stroke: "#94a3b8", strokeWidth: 1, strokeDasharray: "3 3", opacity: 0.3 },
+      } as Edge);
     }
   }
 
