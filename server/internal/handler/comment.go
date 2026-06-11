@@ -1176,7 +1176,7 @@ func (h *Handler) enqueueMentionedAgentTasks(ctx context.Context, issue db.Issue
 		if m.Type != "agent" {
 			continue
 		}
-		if issue.AssigneeType == "squad" && authorType == "agent" {
+		if issue.AssigneeType.Valid && issue.AssigneeType.String == "squad" && authorType == "agent" {
 			continue
 		}
 		agentUUID := parseUUID(m.ID)
