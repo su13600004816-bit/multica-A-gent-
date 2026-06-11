@@ -106,11 +106,11 @@
 ## 7. 验证方法
 > 怎么证明上述"零压缩"结论为真、且上传管线本身可跑。
 
-- **核查门禁(证明"无压缩"为真,可复现)**:在仓库根执行,预期**均无图片压缩命中**:
+- **核查门禁(证明"上传管线无压缩"为真,可复现)**:在仓库根执行,预期**均无上传图片压缩命中**。注意不要用全 `server/` 粗搜 `resize`,当前 `server/internal/daemon/daemon.go` 有 `batch resize` 注释,属于批处理调度语境,不是上传图片压缩实现。
   ```bash
-  # 后端无任何图片库/处理
-  grep -rn "image/jpeg\|image/png\|image.Decode\|jpeg.Encode\|resize\|Thumbnail" server/ | grep -v _test.go   # 预期: 空
-  grep -niE "golang.org/x/image|disintegration/imaging|nfnt/resize|bimg" server/go.mod                          # 预期: 空
+  # 后端上传入口无任何图片解码/缩放/重编码处理
+  grep -nE "image/jpeg|image/png|image\\.Decode|jpeg\\.Encode|resize|Thumbnail" server/internal/handler/file.go  # 预期: 空
+  grep -niE "golang.org/x/image|disintegration/imaging|nfnt/resize|bimg" server/go.mod                           # 预期: 空
   # 前端/移动端无压缩库与压缩调用
   grep -rn "browser-image-compression\|expo-image-manipulator\|manipulateAsync\|toBlob\|OffscreenCanvas" packages apps --include=*.ts --include=*.tsx | grep -v node_modules  # 预期: 空(createImageBitmap 仅尺寸测量,不在此列)
   ```
