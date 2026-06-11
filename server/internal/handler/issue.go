@@ -2364,6 +2364,11 @@ func (h *Handler) UpdateIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Status != nil && *req.Status == "done" && prevIssue.Status != "done" && !h.canMarkIssueDone(r.Context(), prevIssue) {
+		writeError(w, http.StatusConflict, "cannot mark issue done without valid gate/audit PASS evidence")
+		return
+	}
+
 	issue, err := h.Queries.UpdateIssue(r.Context(), params)
 	if err != nil {
 		slog.Warn("update issue failed", append(logger.RequestAttrs(r), "error", err, "issue_id", id, "workspace_id", workspaceID)...)
@@ -2889,6 +2894,10 @@ func (h *Handler) BatchUpdateIssues(w http.ResponseWriter, r *http.Request) {
 			if status, _ := h.validateAssigneePair(r.Context(), r, workspaceID, params.AssigneeType, params.AssigneeID); status != 0 {
 				continue
 			}
+		}
+
+		if req.Updates.Status != nil && *req.Updates.Status == "done" && prevIssue.Status != "done" && !h.canMarkIssueDone(r.Context(), prevIssue) {
+			continue
 		}
 
 		issue, err := h.Queries.UpdateIssue(r.Context(), params)
