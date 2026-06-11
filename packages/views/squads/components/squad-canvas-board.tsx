@@ -357,6 +357,19 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
 
   const nodes: SquadFlowNode[] = [];
   const edges: Edge[] = [];
+  const memberRefs: Array<{ id: string; role: string }> = [];
+  // 主脑互通连线:虚线浅灰,走底部把手,区别于工作流主线。
+  const hubEdge = (id: string, src: string, tgt: string): void => {
+    edges.push({
+      id,
+      source: src,
+      target: tgt,
+      sourceHandle: "bs",
+      targetHandle: "bt",
+      animated: false,
+      style: { stroke: "#94a3b8", strokeWidth: 1, strokeDasharray: "4 4", opacity: 0.4 },
+    } as Edge);
+  };
   const mkNode = (id: string, m: SquadMember, label: string, x: number, y: number): void => {
     nodes.push({
       id,
@@ -404,6 +417,7 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
     const x = i * WF_HX;
     lastX = x;
     mkNode(`wf-m-${i}`, m, st.label, x, 0);
+    memberRefs.push({ id: `wf-m-${i}`, role: st.role });
     if (i > 0) {
       const prev = mainSeq[i - 1];
       edge(`wf-e-${i}`, `wf-m-${i - 1}`, `wf-m-${i}`, "rs", "lt", prev?.audit ? "✅合格" : undefined, false);
@@ -436,9 +450,24 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
     if (!m) return;
     const id = `wf-t-${j}`;
     mkNode(id, m, st.label, lastX, (j + 1) * WF_VY);
+    memberRefs.push({ id, role: st.role });
     edge(`wf-te-${j}`, prevTail, id, "bs", "tt", j === 0 ? "✅合格" : undefined, false);
     prevTail = id;
   });
+
+  // 主脑互通:主线主脑/危机/问题/记忆/看门狗 跟全员连线(管全队)。
+  const HUB_ROLES = ["leader", "crisis", "problem", "memory", "watchdog"];
+  for (const hubRole of HUB_ROLES) {
+    const hub = memberRefs.find((r) => r.role === hubRole);
+    if (!hub) continue;
+    for (const tgt of memberRefs) {
+      if (tgt.id === hub.id) continue;
+      const tgtIsHub = HUB_ROLES.includes(tgt.role);
+      // 主脑之间只连一次,避免重复
+      if (tgtIsHub && HUB_ROLES.indexOf(tgt.role) < HUB_ROLES.indexOf(hubRole)) continue;
+      hubEdge(`wf-hub-${hubRole}-${tgt.id}`, hub.id, tgt.id);
+    }
+  }
 
   return { nodes, edges };
 }
