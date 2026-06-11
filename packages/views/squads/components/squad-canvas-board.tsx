@@ -29,7 +29,6 @@ import { Plus, Trash2, Maximize2, RotateCcw } from "lucide-react";
 import { issueListOptions } from "@multica/core/issues";
 import { STATUS_CONFIG } from "@multica/core/issues/config";
 import { useWorkspaceId } from "@multica/core/hooks";
-import { api } from "@multica/core/api";
 import type { Issue, IssueStatus, SquadMember } from "@multica/core/types";
 
 // Stable empty default so `allIssues` keeps a constant reference while the query is
@@ -336,18 +335,6 @@ function SquadCanvasFlow({
     enabled: !!wsId,
   });
 
-  // P3 服务端持久化:从后端取该小队保存的画布布局(跨设备)。undefined=加载中。
-  const { data: serverLayoutResp } = useQuery({
-    queryKey: ["squadCanvasLayout", squadId],
-    queryFn: () => api.getSquadCanvasLayout(squadId),
-    enabled: !!squadId,
-    staleTime: 30_000,
-  });
-  const serverLayout =
-    serverLayoutResp === undefined
-      ? undefined
-      : ((serverLayoutResp.layout as { positions?: Record<string, { x: number; y: number }>; steps?: SquadFlowNode[]; edges?: Edge[] } | null) ?? null);
-
   // Status per member NODE id (member rows are keyed by m.id, issues by m.member_id),
   // plus an aggregate status for the squad root.
   const { statusByNodeId, rootStatus } = useMemo(() => {
@@ -428,20 +415,14 @@ function SquadCanvasFlow({
   const seedKey = members.map((m) => m.id).join(",");
   const lastSeedKey = useRef<string | null>(null);
   useEffect(() => {
-    // 不阻塞节点渲染:seedKey(成员加载)或服务端布局就绪 任一变化都重应用。
-    // 用 sig 同时跟踪两者,避免刷新时服务端 query 慢卡住只剩根节点。
-    const sig = seedKey + "|" + (serverLayout === undefined ? "" : "s");
-    if (lastSeedKey.current === sig) return;
-    lastSeedKey.current = sig;
-    let saved: { positions?: Record<string, { x: number; y: number }>; steps?: SquadFlowNode[]; edges?: Edge[] } | null =
-      serverLayout && serverLayout.positions ? serverLayout : null;
-    if (!saved) {
-      try {
-        const raw = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null;
-        saved = raw ? JSON.parse(raw) : null;
-      } catch {
-        saved = null;
-      }
+    if (lastSeedKey.current === seedKey) return;
+    lastSeedKey.current = seedKey;
+    let saved: { positions?: Record<string, { x: number; y: number }>; steps?: SquadFlowNode[]; edges?: Edge[] } | null = null;
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null;
+      saved = raw ? JSON.parse(raw) : null;
+    } catch {
+      saved = null;
     }
     if (!saved) {
       setNodes(seed.nodes);
@@ -459,7 +440,7 @@ function SquadCanvasFlow({
       : [];
     setNodes([...placed, ...steps] as SquadFlowNode[]);
     setEdges([...seed.edges, ...customEdges]);
-  }, [seedKey, seed, serverLayout, setNodes, setEdges, storageKey]);
+  }, [seedKey, seed, setNodes, setEdges, storageKey]);
 
   // Live status refresh — patch node tint/dot and the squad→member edge flow in
   // place when statuses change, WITHOUT touching positions, manually-added nodes
@@ -502,15 +483,11 @@ function SquadCanvasFlow({
       const customEdges = es
         .filter((e) => !/^squad-root->/.test(e.id))
         .map((e) => ({ id: e.id, source: e.source, target: e.target, style: e.style }));
-      const payload = { positions, steps, edges: customEdges };
-      window.localStorage.setItem(storageKey, JSON.stringify(payload));
-      if (squadId) {
-        void api.setSquadCanvasLayout(squadId, payload).catch(() => {});
-      }
+      window.localStorage.setItem(storageKey, JSON.stringify({ positions, steps, edges: customEdges }));
     } catch {
       /* localStorage 不可用时静默 */
     }
-  }, [getNodes, getEdges, storageKey, squadId]);
+  }, [getNodes, getEdges, storageKey]);
   const saveSoon = useCallback(() => {
     window.requestAnimationFrame(() => saveLayout());
   }, [saveLayout]);
