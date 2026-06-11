@@ -427,6 +427,9 @@ function SquadCanvasFlow({
     if (!saved) {
       setNodes(seed.nodes);
       setEdges(seed.edges);
+      if (seed.nodes.length > 1) {
+        window.requestAnimationFrame(() => fitView({ padding: 0.25 }));
+      }
       return;
     }
     const pos = saved.positions ?? {};
@@ -440,7 +443,10 @@ function SquadCanvasFlow({
       : [];
     setNodes([...placed, ...steps] as SquadFlowNode[]);
     setEdges([...seed.edges, ...customEdges]);
-  }, [seedKey, seed, setNodes, setEdges, storageKey]);
+    if (seed.nodes.length > 1) {
+      window.requestAnimationFrame(() => fitView({ padding: 0.25 }));
+    }
+  }, [seedKey, seed, setNodes, setEdges, storageKey, fitView]);
 
   // Live status refresh — patch node tint/dot and the squad→member edge flow in
   // place when statuses change, WITHOUT touching positions, manually-added nodes
