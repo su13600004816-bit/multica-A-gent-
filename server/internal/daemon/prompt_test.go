@@ -383,6 +383,60 @@ func TestBuildPromptDefaultMentionsRecent(t *testing.T) {
 	}
 }
 
+// TestBuildPromptCompactedIssueInjectsSummary verifies the PL-91 token 止血:
+// when an assignment task carries a MemorySummary (issue is memory-compacted),
+// the prompt injects the summary and drops the mandatory full-history read.
+func TestBuildPromptCompactedIssueInjectsSummary(t *testing.T) {
+	task := Task{IssueID: "issue-compacted-1", MemorySummary: "T1: 登录重定向已修复。\n\nT2: 关键决策——改用 OAuth2。"}
+	out := BuildPrompt(task, "claude")
+	for _, s := range []string{"archived into a memory summary", "登录重定向已修复", "改用 OAuth2", "drill down incrementally"} {
+		if !strings.Contains(out, s) {
+			t.Errorf("compacted BuildPrompt missing %q\n--- output ---\n%s", s, out)
+		}
+	}
+	// Must NOT demand the full 2000-comment history read — that is exactly the
+	// expensive path this replaces.
+	if strings.Contains(out, "treat the read as mandatory") || strings.Contains(out, "server caps at 2000") {
+		t.Errorf("compacted BuildPrompt must not demand full comment history\n--- output ---\n%s", out)
+	}
+}
+
+// TestBuildPromptNoSummaryKeepsFullHistory verifies the default (un-compacted)
+// assignment prompt still demands the mandatory history read.
+func TestBuildPromptNoSummaryKeepsFullHistory(t *testing.T) {
+	out := BuildPrompt(Task{IssueID: "issue-plain-1"}, "claude")
+	if !strings.Contains(out, "treat the read as mandatory") {
+		t.Errorf("un-compacted BuildPrompt should keep mandatory history read\n--- output ---\n%s", out)
+	}
+	if strings.Contains(out, "archived into a memory summary") {
+		t.Errorf("un-compacted BuildPrompt must not claim a memory summary exists\n--- output ---\n%s", out)
+	}
+}
+
+// TestBuildChatPromptInjectsMemorySummary verifies the PL-91 chat 止血:
+// a fresh chat session started after compaction injects the T1/T2 summary
+// instead of only the latest user message.
+func TestBuildChatPromptInjectsMemorySummary(t *testing.T) {
+	task := Task{
+		ChatSessionID: "cs-1",
+		ChatMessage:   "下一步做什么?",
+		MemorySummary: "T1: 之前讨论了登录 bug。\n\nT2: 已决定用 OAuth2。",
+	}
+	out := BuildPrompt(task, "claude")
+	for _, s := range []string{"compacted memory summary", "登录 bug", "OAuth2", "下一步做什么"} {
+		if !strings.Contains(out, s) {
+			t.Errorf("chat prompt missing %q\n--- output ---\n%s", s, out)
+		}
+	}
+}
+
+func TestBuildChatPromptNoSummaryOmitsSection(t *testing.T) {
+	out := BuildPrompt(Task{ChatSessionID: "cs-2", ChatMessage: "hi"}, "claude")
+	if strings.Contains(out, "compacted memory summary") {
+		t.Errorf("chat prompt without a summary must not claim one exists\n%s", out)
+	}
+}
+
 // TestBuildPromptNonSquadLeaderNoRule verifies that non-squad-leader agents
 // do NOT get the squad leader no_action rule injected.
 func TestBuildPromptNonSquadLeaderNoRule(t *testing.T) {

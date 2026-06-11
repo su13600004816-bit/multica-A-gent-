@@ -438,6 +438,25 @@ func (h *Handler) SendChatMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// PL-91 chat 止血: if the active window (messages since the last
+	// compaction) has grown past the size threshold, archive it into T1..T4
+	// and mark the session compacted now — BEFORE the new user message — so
+	// this message starts a fresh window and the daemon's claim for the
+	// enqueued task carries no PriorSessionID/PriorWorkDir, only the injected
+	// summary. Best-effort: a failure here never blocks the send, and the
+	// original chat_message rows are never deleted.
+	if h.TaskService != nil && h.TaskService.Memory != nil {
+		if compacted, err := h.TaskService.Memory.MaybeCompactChatSession(r.Context(), session); err != nil {
+			slog.Warn("chat session compaction failed (non-fatal)", "session_id", sessionID, "error", err)
+		} else if compacted {
+			// Reload so session-derived state below reflects the cleared
+			// resume pointer / new compacted_at.
+			if fresh, err := h.Queries.GetChatSession(r.Context(), session.ID); err == nil {
+				session = fresh
+			}
+		}
+	}
+
 	// Create the user message first so the daemon can always find it.
 	msg, err := h.Queries.CreateChatMessage(r.Context(), db.CreateChatMessageParams{
 		ChatSessionID: session.ID,

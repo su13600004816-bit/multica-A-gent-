@@ -1292,3 +1292,59 @@ func TestWriteRuntimeConfigFileAlwaysInsertsFixedManagedSeparator(t *testing.T) 
 		})
 	}
 }
+
+// TestInjectRuntimeConfigCompactedAssignmentDropsFullHistory verifies the
+// PL-91 token 止血: an assignment task carrying a MemorySummary gets the
+// summary injected into CLAUDE.md and does NOT get the mandatory full
+// comment-history read instruction.
+func TestInjectRuntimeConfigCompactedAssignmentDropsFullHistory(t *testing.T) {
+	dir := t.TempDir()
+	issueID := "33333333-3333-3333-3333-333333333333"
+	ctx := TaskContextForEnv{
+		IssueID:       issueID,
+		MemorySummary: "T1: 登录重定向已修复。\n\nT2: 关键决策——改用 OAuth2。",
+	}
+	if _, err := InjectRuntimeConfig(dir, "claude", ctx); err != nil {
+		t.Fatalf("InjectRuntimeConfig failed: %v", err)
+	}
+	s := readClaudeMD(t, dir)
+	for _, want := range []string{"archived into a memory summary", "登录重定向已修复", "改用 OAuth2"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("compacted CLAUDE.md missing %q", want)
+		}
+	}
+	// The mandatory full-history directive must be gone; the only remaining
+	// mention of comment history is the "do NOT read it by default" negation.
+	if strings.Contains(s, "this is mandatory, not optional") {
+		t.Errorf("compacted CLAUDE.md must NOT contain the mandatory full-history directive")
+	}
+	if !strings.Contains(s, "do NOT read the full comment history by default") {
+		t.Errorf("compacted CLAUDE.md should steer away from the default full-history read")
+	}
+}
+
+// TestInjectRuntimeConfigUncompactedAssignmentKeepsFullHistory is the control:
+// without a MemorySummary the mandatory full-history step is still present.
+func TestInjectRuntimeConfigUncompactedAssignmentKeepsFullHistory(t *testing.T) {
+	dir := t.TempDir()
+	ctx := TaskContextForEnv{IssueID: "44444444-4444-4444-4444-444444444444"}
+	if _, err := InjectRuntimeConfig(dir, "claude", ctx); err != nil {
+		t.Fatalf("InjectRuntimeConfig failed: %v", err)
+	}
+	s := readClaudeMD(t, dir)
+	if !strings.Contains(s, "this is mandatory, not optional") {
+		t.Errorf("un-compacted CLAUDE.md should keep the mandatory full-history step")
+	}
+	if strings.Contains(s, "archived into a memory summary") {
+		t.Errorf("un-compacted CLAUDE.md must not claim a memory summary exists")
+	}
+}
+
+func readClaudeMD(t *testing.T, dir string) string {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read CLAUDE.md: %v", err)
+	}
+	return string(content)
+}

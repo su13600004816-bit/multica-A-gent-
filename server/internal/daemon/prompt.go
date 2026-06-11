@@ -31,6 +31,14 @@ func BuildPrompt(task Task, provider string) string {
 	b.WriteString("You are running as a local coding agent for a Multica workspace.\n\n")
 	fmt.Fprintf(&b, "Your assigned issue ID is: %s\n\n", task.IssueID)
 	fmt.Fprintf(&b, "Start by running `multica issue get %s --output json` to understand your task, then complete it.\n", task.IssueID)
+	if strings.TrimSpace(task.MemorySummary) != "" {
+		// PL-91 token 止血: this issue's history has been compacted. Inject the
+		// low-gradient T1/T2 summary instead of demanding a full-history read.
+		// The original comments are NOT deleted — drill down only when needed.
+		fmt.Fprintf(&b, "\nThis issue's earlier history has been archived into a memory summary (do NOT pull the full comment history by default — that is the compacted, expensive path this replaces):\n\n%s\n\n", strings.TrimSpace(task.MemorySummary))
+		fmt.Fprintf(&b, "Work from the summary above. Only if it is insufficient for THIS task, drill down incrementally — `multica issue comment list %s --recent 20 --output json` for the latest threads, paging older ones via the stderr cursor — instead of reading the entire history up front.\n", task.IssueID)
+		return b.String()
+	}
 	fmt.Fprintf(&b, "For comment history, follow the rule in your runtime workflow file (assignment-triggered tasks treat the read as mandatory). `multica issue comment list %s --output json` returns all comments for the issue (server caps at 2000). On long-running issues use `--recent 20 --output json` to read the 20 most recently active threads, then page older threads via the stderr `Next thread cursor: ...` line and the matching `--before` / `--before-id` until you have enough history. `--since <RFC3339>` is still available for incremental polling and may combine with `--recent`.\n", task.IssueID)
 	return b.String()
 }
@@ -213,6 +221,14 @@ func buildChatPrompt(task Task) string {
 				b.WriteString("\n")
 			}
 		}
+	}
+	if strings.TrimSpace(task.MemorySummary) != "" {
+		// PL-91: this is a fresh session started after the chat history was
+		// compacted. Inject the T1/T2 summary + archive index so the new
+		// session keeps the earlier conversation context instead of seeing
+		// only the latest message. The full transcript is preserved and can
+		// be retrieved from the memory archive if deeper context is needed.
+		fmt.Fprintf(&b, "Earlier conversation context (compacted memory summary — the full history is archived, not lost):\n\n%s\n\n", strings.TrimSpace(task.MemorySummary))
 	}
 	fmt.Fprintf(&b, "User message:\n%s\n", task.ChatMessage)
 	// List attachments by id + filename so the agent can fetch them via

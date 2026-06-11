@@ -52,6 +52,9 @@ type Task struct {
 	ProjectResources        []ProjectResourceData `json:"project_resources,omitempty"`         // project-scoped resources to expose to the agent
 	PriorSessionID          string                `json:"prior_session_id,omitempty"`          // Claude session ID from a previous task on this issue
 	PriorWorkDir            string                `json:"prior_work_dir,omitempty"`            // work_dir from a previous task on this issue
+	ResumeBlockedReason     string                `json:"resume_blocked_reason,omitempty"`     // PL-91: why the server suppressed prior-session resume
+	MemorySummary           string                `json:"memory_summary,omitempty"`            // PL-91: injected T1/T2 archive summary when the issue is memory-compacted
+	MemorySummaryScope      string                `json:"memory_summary_scope,omitempty"`      // PL-91: archive scope that produced memory_summary
 	TriggerCommentID        string                `json:"trigger_comment_id,omitempty"`        // comment that triggered this task
 	TriggerThreadID         string                `json:"trigger_thread_id,omitempty"`         // root comment ID for the triggering thread; falls back to trigger_comment_id on old servers
 	TriggerCommentContent   string                `json:"trigger_comment_content,omitempty"`   // content of the triggering comment

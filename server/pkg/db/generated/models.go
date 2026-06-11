@@ -22,28 +22,29 @@ type ActivityLog struct {
 }
 
 type Agent struct {
-	ID                 pgtype.UUID        `json:"id"`
-	WorkspaceID        pgtype.UUID        `json:"workspace_id"`
-	Name               string             `json:"name"`
-	AvatarUrl          pgtype.Text        `json:"avatar_url"`
-	RuntimeMode        string             `json:"runtime_mode"`
-	RuntimeConfig      []byte             `json:"runtime_config"`
-	Visibility         string             `json:"visibility"`
-	Status             string             `json:"status"`
-	MaxConcurrentTasks int32              `json:"max_concurrent_tasks"`
-	OwnerID            pgtype.UUID        `json:"owner_id"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	Description        string             `json:"description"`
-	RuntimeID          pgtype.UUID        `json:"runtime_id"`
-	Instructions       string             `json:"instructions"`
-	ArchivedAt         pgtype.Timestamptz `json:"archived_at"`
-	ArchivedBy         pgtype.UUID        `json:"archived_by"`
-	CustomEnv          []byte             `json:"custom_env"`
-	CustomArgs         []byte             `json:"custom_args"`
-	McpConfig          []byte             `json:"mcp_config"`
-	Model              pgtype.Text        `json:"model"`
-	ThinkingLevel      pgtype.Text        `json:"thinking_level"`
+	ID                   pgtype.UUID        `json:"id"`
+	WorkspaceID          pgtype.UUID        `json:"workspace_id"`
+	Name                 string             `json:"name"`
+	AvatarUrl            pgtype.Text        `json:"avatar_url"`
+	RuntimeMode          string             `json:"runtime_mode"`
+	RuntimeConfig        []byte             `json:"runtime_config"`
+	Visibility           string             `json:"visibility"`
+	Status               string             `json:"status"`
+	MaxConcurrentTasks   int32              `json:"max_concurrent_tasks"`
+	OwnerID              pgtype.UUID        `json:"owner_id"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	Description          string             `json:"description"`
+	RuntimeID            pgtype.UUID        `json:"runtime_id"`
+	Instructions         string             `json:"instructions"`
+	ArchivedAt           pgtype.Timestamptz `json:"archived_at"`
+	ArchivedBy           pgtype.UUID        `json:"archived_by"`
+	CustomEnv            []byte             `json:"custom_env"`
+	CustomArgs           []byte             `json:"custom_args"`
+	McpConfig            []byte             `json:"mcp_config"`
+	Model                pgtype.Text        `json:"model"`
+	ThinkingLevel        pgtype.Text        `json:"thinking_level"`
+	SessionResumeEnabled bool               `json:"session_resume_enabled"`
 }
 
 type AgentRuntime struct {
@@ -193,6 +194,7 @@ type ChatSession struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	UnreadSince pgtype.Timestamptz `json:"unread_since"`
 	RuntimeID   pgtype.UUID        `json:"runtime_id"`
+	CompactedAt pgtype.Timestamptz `json:"compacted_at"`
 }
 
 type Comment struct {
@@ -358,6 +360,7 @@ type Issue struct {
 	FirstExecutedAt    pgtype.Timestamptz `json:"first_executed_at"`
 	StartDate          pgtype.Date        `json:"start_date"`
 	Metadata           []byte             `json:"metadata"`
+	MemoryCompactedAt  pgtype.Timestamptz `json:"memory_compacted_at"`
 }
 
 type IssueDependency struct {
@@ -492,6 +495,21 @@ type Member struct {
 	UserID      pgtype.UUID        `json:"user_id"`
 	Role        string             `json:"role"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type MemoryArchive struct {
+	ID               pgtype.UUID        `json:"id"`
+	WorkspaceID      pgtype.UUID        `json:"workspace_id"`
+	ScopeType        string             `json:"scope_type"`
+	ScopeID          pgtype.UUID        `json:"scope_id"`
+	Level            string             `json:"level"`
+	Content          string             `json:"content"`
+	SourceFrom       pgtype.Timestamptz `json:"source_from"`
+	SourceTo         pgtype.Timestamptz `json:"source_to"`
+	SourceCount      int32              `json:"source_count"`
+	Generator        string             `json:"generator"`
+	CreatedByAgentID pgtype.UUID        `json:"created_by_agent_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
 type NotificationPreference struct {
@@ -747,18 +765,19 @@ type WebhookDelivery struct {
 }
 
 type Workspace struct {
-	ID           pgtype.UUID        `json:"id"`
-	Name         string             `json:"name"`
-	Slug         string             `json:"slug"`
-	Description  pgtype.Text        `json:"description"`
-	Settings     []byte             `json:"settings"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-	Context      pgtype.Text        `json:"context"`
-	Repos        []byte             `json:"repos"`
-	IssuePrefix  string             `json:"issue_prefix"`
-	IssueCounter int32              `json:"issue_counter"`
-	AvatarUrl    pgtype.Text        `json:"avatar_url"`
+	ID                   pgtype.UUID        `json:"id"`
+	Name                 string             `json:"name"`
+	Slug                 string             `json:"slug"`
+	Description          pgtype.Text        `json:"description"`
+	Settings             []byte             `json:"settings"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	Context              pgtype.Text        `json:"context"`
+	Repos                []byte             `json:"repos"`
+	IssuePrefix          string             `json:"issue_prefix"`
+	IssueCounter         int32              `json:"issue_counter"`
+	AvatarUrl            pgtype.Text        `json:"avatar_url"`
+	SessionResumeEnabled bool               `json:"session_resume_enabled"`
 }
 
 type WorkspaceInvitation struct {

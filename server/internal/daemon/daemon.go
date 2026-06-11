@@ -2221,6 +2221,9 @@ func (d *Daemon) handleTask(ctx context.Context, task Task, slot int) {
 		"trigger_comment_id", task.TriggerCommentID,
 		"resume_session", task.PriorSessionID != "",
 		"reuse_workdir", task.PriorWorkDir != "",
+		"resume_blocked_reason", task.ResumeBlockedReason,
+		"memory_summary_present", strings.TrimSpace(task.MemorySummary) != "",
+		"memory_summary_scope", task.MemorySummaryScope,
 	)
 
 	// If the task targets a project_resource of type local_directory that
@@ -2623,6 +2626,7 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 		NewCommentCount:                  task.NewCommentCount,
 		NewCommentsSince:                 task.NewCommentsSince,
 		PriorSessionResumed:              task.PriorSessionID != "",
+		MemorySummary:                    task.MemorySummary,
 		AgentID:                          agentID,
 		AgentName:                        agentName,
 		AgentInstructions:                instructions,

@@ -80,6 +80,12 @@ type TaskContextForEnv struct {
 	AutopilotTriggerPayload string
 	QuickCreatePrompt       string // non-empty for quick-create tasks
 	IsSquadLeader           bool   // true when the agent is acting as a squad leader (may exit silently on no_action)
+	// MemorySummary is the low-gradient (T1/T2) archive summary for a
+	// memory-compacted issue (PL-91). When non-empty the assignment brief
+	// injects it and DROPS the otherwise-mandatory "read the full comment
+	// history" step — the agent works from the summary and drills down only
+	// when needed, which is the token 止血.
+	MemorySummary string
 	// WorkspaceContext is the workspace-level system prompt (workspace.context
 	// in the DB). Rendered into the brief as `## Workspace Context` when
 	// non-empty so every agent in the workspace sees the same shared context,

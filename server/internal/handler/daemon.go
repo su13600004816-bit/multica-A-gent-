@@ -1055,6 +1055,30 @@ func logClaimEndpointSlow(runtimeID, outcome string, start time.Time, authMs, cl
 	)
 }
 
+// sessionResumeBlockReason reports why the daemon must start a FRESH agent
+// session for this task instead of resuming a prior one (PL-91). It returns a
+// stable empty/non-empty reason when an operator disabled session resume for
+// the agent/workspace, or when the issue's memory was compacted.
+//
+// Checks are best-effort and fail OPEN: on any lookup error we return false
+// and keep the historical resume behaviour, because a failed check must never
+// strand a task without its conversation context. Pass an invalid issueID for
+// chat tasks (chat compaction is read directly from chat_session.compacted_at
+// by the caller).
+func (h *Handler) sessionResumeBlockReason(ctx context.Context, agentID, issueID pgtype.UUID) string {
+	if agentID.Valid {
+		if enabled, err := h.Queries.GetAgentSessionResumeEnabled(ctx, agentID); err == nil && !enabled {
+			return "session_resume_disabled"
+		}
+	}
+	if issueID.Valid {
+		if at, err := h.Queries.GetIssueMemoryCompactedAt(ctx, issueID); err == nil && at.Valid {
+			return "issue_memory_compacted"
+		}
+	}
+	return ""
+}
+
 // ClaimTaskByRuntime atomically claims the next queued task for a runtime.
 // The response includes the agent's name and skills, fetched fresh from the DB.
 func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
@@ -1343,7 +1367,21 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		// the user just judged the prior output bad, so the daemon must start a
 		// fresh agent session in a fresh workdir instead of resuming anything
 		// from the same conversation that produced that output.
-		if !task.ForceFreshSession {
+		//
+		// Also skip when the issue's memory was compacted (PL-91) or an
+		// operator disabled session resume for this agent/workspace: in both
+		// cases the next task must start fresh and rely on the injected T1/T2
+		// summary instead of re-ingesting the old provider session.
+		resumeBlockReason := ""
+		if task.ForceFreshSession {
+			resumeBlockReason = "force_fresh_session"
+		} else {
+			resumeBlockReason = h.sessionResumeBlockReason(r.Context(), task.AgentID, task.IssueID)
+		}
+		if resumeBlockReason != "" {
+			resp.ResumeBlockedReason = resumeBlockReason
+		}
+		if resumeBlockReason == "" {
 			if prior, err := h.Queries.GetLastTaskSession(r.Context(), db.GetLastTaskSessionParams{
 				AgentID: task.AgentID,
 				IssueID: task.IssueID,
@@ -1362,6 +1400,17 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+
+		// PL-91: inject the low-gradient T1/T2 summary for a memory-compacted
+		// issue so the fresh session has context without the prompt demanding a
+		// full comment-history read. Best-effort; empty until the issue has
+		// been archived (i.e. only set once compaction has happened).
+		if h.TaskService != nil && h.TaskService.Memory != nil {
+			if summary := h.TaskService.Memory.IssueMemorySummary(r.Context(), task.IssueID); summary != "" {
+				resp.MemorySummary = summary
+				resp.MemorySummaryScope = "issue"
+			}
+		}
 	}
 
 	// Chat task: populate workspace/session info from the chat_session table.
@@ -1376,28 +1425,57 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 					resp.Repos = repos
 				}
 			}
-			if !task.ForceFreshSession {
+			resumeBlockReason := ""
+			if task.ForceFreshSession {
+				resumeBlockReason = "force_fresh_session"
+			} else {
+				resumeBlockReason = h.sessionResumeBlockReason(r.Context(), task.AgentID, pgtype.UUID{})
+			}
+			if resumeBlockReason != "" {
+				resp.ResumeBlockedReason = resumeBlockReason
+			}
+			if resumeBlockReason == "" {
 				// Resume chat sessions only when the stored pointer was produced
-				// by the same runtime as the claiming task. When the chat_session
-				// pointer is missing (legacy NULL runtime_id), stale (last task
-				// failed before reporting completion), or runtime-mismatched, fall
-				// back to the most recent task row that recorded a session_id —
-				// otherwise a single failed turn would silently drop the entire
-				// conversation memory on the next message. The fallback also
-				// requires runtime to match.
+				// by the same runtime as the claiming task. PL-91: when a session
+				// was compacted, MarkChatSessionCompacted cleared its
+				// session_id/work_dir, so this primary resume naturally yields
+				// nothing on the first post-compaction claim — the fresh session
+				// carries only the injected summary. Once a fresh session
+				// completes, CompleteTask repopulates cs.SessionID and continuity
+				// resumes from there.
 				if cs.SessionID.Valid && cs.RuntimeID.Valid && cs.RuntimeID == task.RuntimeID {
 					resp.PriorSessionID = cs.SessionID.String
 				}
 				if cs.WorkDir.Valid {
 					resp.PriorWorkDir = cs.WorkDir.String
 				}
-				if prior, err := h.Queries.GetLastChatTaskSession(r.Context(), cs.ID); err == nil && prior.SessionID.Valid {
-					if resp.PriorSessionID == "" && prior.RuntimeID == task.RuntimeID {
-						resp.PriorSessionID = prior.SessionID.String
+				// The cross-task fallback recovers a session_id from a prior task
+				// row when the chat_session pointer is missing. For a COMPACTED
+				// session we must NOT take it: it could reach a pre-compaction
+				// task and silently undo the 止血. Skip it while compacted; the
+				// primary pointer above is the only resume path post-compaction.
+				if !cs.CompactedAt.Valid {
+					if prior, err := h.Queries.GetLastChatTaskSession(r.Context(), cs.ID); err == nil && prior.SessionID.Valid {
+						if resp.PriorSessionID == "" && prior.RuntimeID == task.RuntimeID {
+							resp.PriorSessionID = prior.SessionID.String
+						}
+						if prior.WorkDir.Valid && resp.PriorWorkDir == "" {
+							resp.PriorWorkDir = prior.WorkDir.String
+						}
 					}
-					if prior.WorkDir.Valid && resp.PriorWorkDir == "" {
-						resp.PriorWorkDir = prior.WorkDir.String
-					}
+				} else if resp.PriorSessionID == "" && resp.PriorWorkDir == "" {
+					resp.ResumeBlockedReason = "chat_memory_compacted"
+				}
+			}
+			// PL-91: after a chat session is compacted, the fresh provider
+			// session must still carry the low-gradient summary or the
+			// conversation context is lost. Inject the chat scope's T1/T2
+			// summary so buildChatPrompt can prepend it. Best-effort; empty
+			// until the session has actually been compacted/archived.
+			if cs.CompactedAt.Valid && h.TaskService != nil && h.TaskService.Memory != nil {
+				if summary := h.TaskService.Memory.ChatSessionMemorySummary(r.Context(), cs.ID); summary != "" {
+					resp.MemorySummary = summary
+					resp.MemorySummaryScope = "chat_session"
 				}
 			}
 			// Build the chat prompt from EVERY user message that has arrived
@@ -1683,7 +1761,7 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		resp.AuthToken = tokenStr
 	}
 
-	slog.Info("task claimed by runtime", "task_id", uuidToString(task.ID), "runtime_id", runtimeID, "agent_id", uuidToString(task.AgentID), "prior_session", resp.PriorSessionID)
+	slog.Info("task claimed by runtime", "task_id", uuidToString(task.ID), "runtime_id", runtimeID, "agent_id", uuidToString(task.AgentID), "prior_session", resp.PriorSessionID, "resume_blocked_reason", resp.ResumeBlockedReason, "memory_summary_scope", resp.MemorySummaryScope)
 	writeJSON(w, http.StatusOK, map[string]any{"task": resp})
 }
 

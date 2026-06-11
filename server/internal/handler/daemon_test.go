@@ -2392,6 +2392,7 @@ type claimRuntimeGuardTask struct {
 	PriorWorkDir   string `json:"prior_work_dir"`
 	ChatMessage    string `json:"chat_message"`
 	ThreadName     string `json:"thread_name"`
+	ResumeBlockedReason string `json:"resume_blocked_reason"`
 }
 
 func claimTaskForRuntimeGuard(t *testing.T, runtimeID, daemonID string) *claimRuntimeGuardTask {
@@ -2779,6 +2780,9 @@ func TestClaimTask_IssuePriorSessionRuntimeGuard(t *testing.T) {
 	if task.PriorWorkDir != "" {
 		t.Fatalf("force fresh: expected empty PriorWorkDir, got %q", task.PriorWorkDir)
 	}
+	if task.ResumeBlockedReason != "force_fresh_session" {
+		t.Fatalf("force fresh: expected ResumeBlockedReason='force_fresh_session', got %q", task.ResumeBlockedReason)
+	}
 }
 
 func TestClaimTask_ChatPriorSessionRuntimeGuard(t *testing.T) {
@@ -3104,6 +3108,9 @@ func TestClaimTask_ChatForceFreshSessionSkipsPriorSession(t *testing.T) {
 	}
 	if task.PriorWorkDir != "" {
 		t.Fatalf("force fresh chat: expected empty PriorWorkDir, got %q", task.PriorWorkDir)
+	}
+	if task.ResumeBlockedReason != "force_fresh_session" {
+		t.Fatalf("force fresh chat: expected ResumeBlockedReason='force_fresh_session', got %q", task.ResumeBlockedReason)
 	}
 }
 
