@@ -558,6 +558,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/members", h.ListMembersWithUser)
 					r.Post("/leave", h.LeaveWorkspace)
 					r.Get("/invitations", h.ListWorkspaceInvitations)
+					r.Post("/p0/notifications", h.CreateP0Notification)
+					r.Get("/p0/pending", h.ListPendingP0Notifications)
+					r.Post("/p0/notifications/{p0Id}/ack", h.AckP0Notification)
 					// Listing GitHub installations is member-visible so the
 					// integrations tab no longer renders blank for non-admins;
 					// the handler strips the management handle and adds a
