@@ -806,6 +806,17 @@ export class ApiClient {
     });
   }
 
+  async getSquadCanvasLayout(squadId: string): Promise<{ layout: unknown }> {
+    return this.fetch(`/api/squads/${squadId}/canvas-layout`);
+  }
+
+  async setSquadCanvasLayout(squadId: string, layout: unknown): Promise<{ ok: boolean }> {
+    return this.fetch(`/api/squads/${squadId}/canvas-layout`, {
+      method: "PUT",
+      body: JSON.stringify({ layout }),
+    });
+  }
+
   async archiveAgent(id: string): Promise<Agent> {
     return this.fetch(`/api/agents/${id}/archive`, { method: "POST" });
   }
