@@ -345,10 +345,6 @@ const SUPS: Array<{ key: string; label: string }> = [
   { key: "code", label: "B4 代码主管" },
   { key: "problem", label: "B6 问题主管" },
 ];
-const SUP_OF: Record<string, string> = {
-  leader: "task", audit: "audit", crisis: "crisis", watchdog: "crisis",
-  memory: "memory", optimize: "code", codeDig: "code", write: "code", problem: "problem",
-};
 
 type WfDeps = {
   members: SquadMember[];
@@ -394,8 +390,10 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
   };
 
   const HX = 250;
-  const Y_BOSS = -470;
-  const Y_SUP = -320;
+  const Y_SU = -760;
+  const Y_A1 = -630;
+  const Y_A2 = -500;
+  const Y_SUP = -350;
   const Y_HUB = -150;
   const Y_FLOW = 60;
   const Y_REWORK = 250;
@@ -446,44 +444,59 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
     edge("wf-start", hubNodeId.leader, "wf-m-0", "bs", "tt", "派发", "#22c55e");
   }
 
-  // 经理 + 主管
-  mkBox("wf-boss-a1", "A1 cc 统筹经理", 1 * HX, Y_BOSS);
-  mkBox("wf-boss-a2", "A2 cx 统筹副经理", 2 * HX, Y_BOSS);
-  edge("wf-mgr-a", "wf-boss-a2", "wf-boss-a1", "ts", "bs", undefined, "#a855f7", "5 4");
+  // —— 管理树:苏总 → 经理A1 → 副经理A2 → 主管B → 主脑/工种(管,向下)——
+  const CX = 3 * HX;
+  mkBox("wf-su", "苏总", CX, Y_SU);
+  mkBox("wf-a1", "A1 cc 统筹经理", CX, Y_A1);
+  mkBox("wf-a2", "A2 cx 统筹副经理", CX, Y_A2);
+  edge("wf-mg-su-a1", "wf-su", "wf-a1", "bs", "tt", "管", "#a855f7", "5 4");
+  edge("wf-mg-a1-a2", "wf-a1", "wf-a2", "bs", "tt", "管", "#a855f7", "5 4");
   const supId: Record<string, string> = {};
   SUPS.forEach((sp, i) => {
     const id = `wf-sup-${sp.key}`;
     mkBox(id, sp.label, i * HX, Y_SUP);
     supId[sp.key] = id;
-    edge(`wf-supup-${sp.key}`, id, "wf-boss-a2", "ts", "bs", undefined, "#a855f7", "5 4");
+    edge(`wf-a2-sup-${sp.key}`, "wf-a2", id, "bs", "tt", undefined, "#a855f7", "5 4");
   });
-  for (const h of hubRoles) {
-    const sk = SUP_OF[h.role];
-    const hid = hubNodeId[h.role];
-    const sid = sk ? supId[sk] : undefined;
-    if (sid && hid) {
-      edge(`wf-rep-${h.role}`, hid, sid, "ts", "bs", "汇报", "#a855f7", "5 4");
-    }
+  // 主管 → 对应主脑/工种(跨队管同工种;本队连本队那个)
+  const auditId = byRole.audit ? "wf-m-1" : undefined;
+  const writeId = byRole.write ? "wf-m-0" : undefined;
+  const supTarget: Record<string, string | undefined> = {
+    task: hubNodeId.leader,
+    crisis: hubNodeId.crisis,
+    memory: hubNodeId.memory,
+    problem: hubNodeId.problem,
+    audit: auditId,
+    code: writeId,
+  };
+  for (const sp of SUPS) {
+    const sid = supId[sp.key];
+    const tgt = supTarget[sp.key];
+    if (sid && tgt) edge(`wf-supmg-${sp.key}`, sid, tgt, "bs", "tt", "管", "#a855f7", "5 4");
+  }
+  // 看门狗 归 危机主脑 管(不直连主管)
+  if (hubNodeId.crisis && hubNodeId.watchdog) {
+    edge("wf-wd-crisis", hubNodeId.crisis, hubNodeId.watchdog, "rs", "lt", "管", "#a855f7", "5 4");
   }
 
-  // 主脑互通:每个主脑 → 全工作流唯一成员(去重,不漏)
-  const uniq = new Map<string, string>();
-  for (const n of nodes) {
-    if (n.type !== "squadMember") continue;
-    const mid = (n.data as MemberNodeData).memberId;
-    if (mid && !uniq.has(mid)) uniq.set(mid, n.id);
-  }
+  // —— 主脑互通:每个主脑 → 全体工作流/返工成员(各节点独立·不去重·不漏)——
+  // 返工是独立岗位,各自单独连;记忆主脑同样跟全员互通(储存/清除),隔离体现在它单独的记忆线。
   const hubIdSet = new Set(Object.values(hubNodeId));
+  const workerIds = nodes
+    .filter((n) => n.type === "squadMember" && !hubIdSet.has(n.id))
+    .map((n) => n.id);
   for (const h of hubRoles) {
-    const hubM = byRole[h.role];
     const hid = hubNodeId[h.role];
-    if (!hubM || !hid) continue;
-    for (const [mid, nodeId] of uniq) {
-      if (mid === hubM.member_id || hubIdSet.has(nodeId)) continue;
+    if (!hid) continue;
+    for (const wid of workerIds) {
       edges.push({
-        id: `wf-link-${h.role}-${nodeId}`, source: hid, target: nodeId,
-        sourceHandle: "bs", targetHandle: "tt", animated: false,
-        style: { stroke: "#94a3b8", strokeWidth: 1, strokeDasharray: "3 3", opacity: 0.3 },
+        id: `wf-link-${h.role}-${wid}`,
+        source: hid,
+        target: wid,
+        sourceHandle: "bs",
+        targetHandle: "tt",
+        animated: false,
+        style: { stroke: "#94a3b8", strokeWidth: 1, strokeDasharray: "3 3", opacity: 0.22 },
       } as Edge);
     }
   }
