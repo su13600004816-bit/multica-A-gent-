@@ -261,6 +261,66 @@ func TestAuth_StripsClientSuppliedActorSource(t *testing.T) {
 	}
 }
 
+func TestTaskTokenHeaderConflict(t *testing.T) {
+	const boundAgentID = "11111111-1111-1111-1111-111111111111"
+	const boundTaskID = "22222222-2222-2222-2222-222222222222"
+	const qwenAgentID = "33333333-3333-3333-3333-333333333333"
+	const deepseekTaskID = "44444444-4444-4444-4444-444444444444"
+
+	cases := []struct {
+		name          string
+		claimedAgent string
+		claimedTask  string
+		wantConflict bool
+	}{
+		{
+			name:          "no client supplied identity headers",
+			wantConflict: false,
+		},
+		{
+			name:          "matching headers from current daemon",
+			claimedAgent: boundAgentID,
+			claimedTask:  boundTaskID,
+			wantConflict: false,
+		},
+		{
+			name:          "matching headers are case insensitive",
+			claimedAgent: "11111111-1111-1111-1111-111111111111",
+			claimedTask:  "22222222-2222-2222-2222-222222222222",
+			wantConflict: false,
+		},
+		{
+			name:          "ordinary task token claims qwen agent identity",
+			claimedAgent: qwenAgentID,
+			claimedTask:  boundTaskID,
+			wantConflict: true,
+		},
+		{
+			name:          "ordinary task token claims deepseek task identity",
+			claimedAgent: boundAgentID,
+			claimedTask:  deepseekTaskID,
+			wantConflict: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/probe", nil)
+			if tc.claimedAgent != "" {
+				req.Header.Set("X-Agent-ID", tc.claimedAgent)
+			}
+			if tc.claimedTask != "" {
+				req.Header.Set("X-Task-ID", tc.claimedTask)
+			}
+
+			got := taskTokenHeaderConflict(req, boundAgentID, boundTaskID)
+			if got != tc.wantConflict {
+				t.Fatalf("taskTokenHeaderConflict() = %v, want %v", got, tc.wantConflict)
+			}
+		})
+	}
+}
+
 // TestAuth_PATCacheHit pins the optimization: when the PAT cache already
 // holds an entry for this token, the middleware MUST NOT call into queries
 // — it short-circuits before the DB lookup and the last_used_at update.
