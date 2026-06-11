@@ -357,7 +357,6 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
 
   const nodes: SquadFlowNode[] = [];
   const edges: Edge[] = [];
-  const memberRefs: Array<{ id: string; role: string }> = [];
   // 主脑互通连线:虚线浅灰,走底部把手,区别于工作流主线。
   const hubEdge = (id: string, src: string, tgt: string): void => {
     edges.push({
@@ -417,7 +416,6 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
     const x = i * WF_HX;
     lastX = x;
     mkNode(`wf-m-${i}`, m, st.label, x, 0);
-    memberRefs.push({ id: `wf-m-${i}`, role: st.role });
     if (i > 0) {
       const prev = mainSeq[i - 1];
       edge(`wf-e-${i}`, `wf-m-${i - 1}`, `wf-m-${i}`, "rs", "lt", prev?.audit ? "✅合格" : undefined, false);
@@ -450,22 +448,31 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
     if (!m) return;
     const id = `wf-t-${j}`;
     mkNode(id, m, st.label, lastX, (j + 1) * WF_VY);
-    memberRefs.push({ id, role: st.role });
     edge(`wf-te-${j}`, prevTail, id, "bs", "tt", j === 0 ? "✅合格" : undefined, false);
     prevTail = id;
   });
 
   // 主脑互通:主线主脑/危机/问题/记忆/看门狗 跟全员连线(管全队)。
+  // 按 member_id 去重 → 每个唯一成员(含只在返工里出现的返工深挖)一个代表节点,绝不漏。
+  const uniqueMembers = new Map<string, string>();
+  for (const n of nodes) {
+    const mid = (n.data as MemberNodeData).memberId;
+    if (mid && !uniqueMembers.has(mid)) uniqueMembers.set(mid, n.id);
+  }
   const HUB_ROLES = ["leader", "crisis", "problem", "memory", "watchdog"];
+  const hubMids = new Set(
+    HUB_ROLES.map((r) => byRole[r]?.member_id).filter((x): x is string => !!x),
+  );
   for (const hubRole of HUB_ROLES) {
-    const hub = memberRefs.find((r) => r.role === hubRole);
-    if (!hub) continue;
-    for (const tgt of memberRefs) {
-      if (tgt.id === hub.id) continue;
-      const tgtIsHub = HUB_ROLES.includes(tgt.role);
-      // 主脑之间只连一次,避免重复
-      if (tgtIsHub && HUB_ROLES.indexOf(tgt.role) < HUB_ROLES.indexOf(hubRole)) continue;
-      hubEdge(`wf-hub-${hubRole}-${tgt.id}`, hub.id, tgt.id);
+    const hubM = byRole[hubRole];
+    if (!hubM) continue;
+    const hubId = uniqueMembers.get(hubM.member_id);
+    if (!hubId) continue;
+    for (const [mid, nodeId] of uniqueMembers) {
+      if (mid === hubM.member_id) continue;
+      // 主脑之间只连一次(member_id 小的发起)
+      if (hubMids.has(mid) && mid < hubM.member_id) continue;
+      hubEdge(`wf-hub-${hubRole}-${nodeId}`, hubId, nodeId);
     }
   }
 
