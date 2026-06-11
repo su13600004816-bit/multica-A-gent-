@@ -56,18 +56,65 @@ func isTrustedDoneGateAuthor(authorType string) bool {
 }
 
 func doneGateCommentVerdict(content string) (bool, bool) {
-	normalized := strings.ToUpper(content)
-	if strings.Contains(normalized, "[MSG] AUDIT_PASS") {
+	var verdict bool
+	var found bool
+	for _, line := range strings.Split(content, "\n") {
+		if v, ok := doneGateLineVerdict(line); ok {
+			verdict = v
+			found = true
+		}
+	}
+	return verdict, found
+}
+
+func doneGateLineVerdict(line string) (bool, bool) {
+	trimmed := strings.TrimLeft(line, " \t`")
+	normalized := strings.ToUpper(trimmed)
+	if strings.HasPrefix(normalized, "[MSG] AUDIT_PASS") {
 		return true, true
 	}
-	if strings.Contains(normalized, "[MSG] AUDIT_FAIL") {
+	if strings.HasPrefix(normalized, "[MSG] AUDIT_FAIL") {
 		return false, true
 	}
-	if strings.Contains(normalized, "VERDICT: PASS") || strings.Contains(normalized, "VERDICT：PASS") {
-		return true, true
+
+	candidates := []struct {
+		marker  string
+		verdict bool
+	}{
+		{"VERDICT: PASS", true},
+		{"VERDICT：PASS", true},
+		{"VERDICT: FAIL", false},
+		{"VERDICT：FAIL", false},
 	}
-	if strings.Contains(normalized, "VERDICT: FAIL") || strings.Contains(normalized, "VERDICT：FAIL") {
-		return false, true
+	for _, candidate := range candidates {
+		if verdictMarkerInConclusionPosition(normalized, candidate.marker) {
+			return candidate.verdict, true
+		}
 	}
 	return false, false
+}
+
+func verdictMarkerInConclusionPosition(line, marker string) bool {
+	start := 0
+	for {
+		idx := strings.Index(line[start:], marker)
+		if idx < 0 {
+			return false
+		}
+		idx += start
+		if idx == 0 || precededBySentenceEnd(line[:idx]) {
+			return true
+		}
+		start = idx + len(marker)
+	}
+}
+
+func precededBySentenceEnd(prefix string) bool {
+	prefix = strings.TrimSpace(prefix)
+	prefix = strings.TrimRight(prefix, "`")
+	if prefix == "" {
+		return true
+	}
+	last := []rune(prefix)[len([]rune(prefix))-1]
+	return strings.ContainsRune("。．.!?！？", last)
 }

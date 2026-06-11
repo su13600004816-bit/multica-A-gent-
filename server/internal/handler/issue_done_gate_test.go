@@ -75,6 +75,34 @@ func TestUpdateIssueDoneGateRejectsWhenLatestVerdictFails(t *testing.T) {
 	}
 }
 
+func TestUpdateIssueDoneGateIgnoresQuotedVerdictText(t *testing.T) {
+	issueID := createTestIssue(t, "done gate ignores quoted pass", "in_review", "medium")
+	t.Cleanup(func() { deleteTestIssue(t, issueID) })
+	createCommentForDoneGateTest(t, issueID, "agent", "上一轮写过 VERDICT: PASS，但这只是复述旧结论，不能放行。")
+
+	w := httptest.NewRecorder()
+	req := newRequest("PUT", "/api/issues/"+issueID, map[string]any{"status": "done"})
+	req = withURLParam(req, "id", issueID)
+	testHandler.UpdateIssue(w, req)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateIssueDoneGateAllowsVerdictAfterSentenceBoundary(t *testing.T) {
+	issueID := createTestIssue(t, "done gate allows sentence verdict", "in_review", "medium")
+	t.Cleanup(func() { deleteTestIssue(t, issueID) })
+	createCommentForDoneGateTest(t, issueID, "agent", "证据完整。VERDICT: PASS")
+
+	w := httptest.NewRecorder()
+	req := newRequest("PUT", "/api/issues/"+issueID, map[string]any{"status": "done"})
+	req = withURLParam(req, "id", issueID)
+	testHandler.UpdateIssue(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestBatchUpdateIssuesDoneGateSkipsMissingEvidence(t *testing.T) {
 	blockedID := createTestIssue(t, "batch done gate blocked", "in_review", "medium")
 	allowedID := createTestIssue(t, "batch done gate allowed", "in_review", "medium")
