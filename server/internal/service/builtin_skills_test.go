@@ -202,6 +202,38 @@ func TestMentioningSkillTeachesTheParserContract(t *testing.T) {
 	}
 }
 
+// TestMentioningSkillTeachesNoTriggerProtocol pins the suppress_triggers /
+// --no-trigger contract into the always-loaded skill body so the leader brain
+// (and every agent that loads this skill) is told how to post a visible comment
+// that wakes nobody, and when to use it.
+func TestMentioningSkillTeachesNoTriggerProtocol(t *testing.T) {
+	skill, ok := findSkill(t, "multica-mentioning")
+	if !ok {
+		return
+	}
+	_, body, _ := splitFrontmatter(skill.Content)
+
+	mustContain := []string{
+		"suppress_triggers",
+		"--no-trigger",
+		"multica issue comment add <issue-id> --no-trigger",
+		"No-trigger protocol",
+		"watchdog / canary",
+		"audit-sync acknowledgements",
+		"`/note`",
+		"backward-compatible shortcut",
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(body, want) {
+			t.Errorf("mentioning skill missing no-trigger protocol text %q", want)
+		}
+	}
+
+	if !skillHasFile(skill, "references/mentioning-source-map.md") {
+		t.Errorf("mentioning skill missing supporting file references/mentioning-source-map.md")
+	}
+}
+
 func TestWorkingOnIssuesSkillCoversIssueLoopContracts(t *testing.T) {
 	skill, ok := findSkill(t, "multica-working-on-issues")
 	if !ok {

@@ -83,6 +83,31 @@ mention is treated as a broadcast that SUPPRESSES the issue assignee's
 automatic on-comment trigger. Use `@all` to announce, not to request work from
 the assignee.
 
+## suppress_triggers — a visible comment that wakes nobody
+
+Mentions and `@all` only steer WHO wakes. To post a comment that is stored and
+rendered like any other but wakes NO agent at all — no assignee on-comment run,
+no squad leader, no `@mention` run — set `suppress_triggers` on the create
+request. The CLI exposes this as `--no-trigger`:
+
+    multica issue comment add <issue-id> --no-trigger --content "..."
+
+This is the request-body-level switch. The server gates ALL three wake paths on
+it at the single chokepoint `triggerTasksForComment`
+(`server/internal/handler/comment.go`): when `suppress_triggers` is true the
+function returns before the assignee, squad-leader, and `@mention` enqueue paths
+run, so even a comment that `@mentions` an agent fires nothing.
+
+No-trigger protocol — use `--no-trigger` for visible-but-not-actionable
+comments: closeout notes, audit-sync acknowledgements, watchdog / canary /
+status updates — anything the next run should SEE but not be WOKEN by. To hand
+off work and intentionally wake a target, omit the flag and use a controlled
+`@agent` / `@squad` mention instead.
+
+The legacy `/note` content prefix (first token `/note`, case-insensitive) is a
+backward-compatible shortcut for the same suppression and still works, but it is
+NOT a substitute for the request-body flag — prefer `--no-trigger`.
+
 ## What does NOT happen (so the result doesn't surprise you)
 
 These are all silent no-ops — no error, no run:

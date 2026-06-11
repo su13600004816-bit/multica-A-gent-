@@ -772,6 +772,12 @@ type CreateCommentRequest struct {
 	Type          string   `json:"type"`
 	ParentID      *string  `json:"parent_id"`
 	AttachmentIDs []string `json:"attachment_ids"`
+	// SuppressTriggers stores and shows the comment normally but fires NONE of
+	// the agent wake paths (assignee on-comment, squad leader, @mention). This
+	// is the request-body-level "visible but no wake" switch (CLI:
+	// `--no-trigger`). It supersedes the legacy `/note` content prefix, which is
+	// kept only as a compatibility shortcut for the same effect.
+	SuppressTriggers bool `json:"suppress_triggers"`
 }
 
 func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
@@ -925,7 +931,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	// must keep the resolved root in sync.
 	h.TaskService.AutoUnresolveThreadOnReply(r.Context(), rootComment, uuidToString(issue.WorkspaceID), authorType, authorID)
 
-	h.triggerTasksForComment(r.Context(), issue, comment, parentComment, authorType, authorID)
+	h.triggerTasksForComment(r.Context(), issue, comment, parentComment, authorType, authorID, req.SuppressTriggers)
 
 	writeJSON(w, http.StatusCreated, resp)
 }
@@ -948,14 +954,18 @@ func isNoteComment(content string) bool {
 	return strings.EqualFold(firstToken, noteCommentPrefix)
 }
 
-func (h *Handler) triggerTasksForComment(ctx context.Context, issue db.Issue, comment db.Comment, parentComment *db.Comment, actorType, actorID string) {
-	// A comment opening with the reserved /note prefix is a human-only note: it
-	// is recorded like any other comment but must not wake ANY agent. This guard
-	// lives at the single chokepoint so it covers all three trigger paths below
-	// (assignee, squad leader, and @mentioned agents). Gating only
-	// shouldEnqueueOnComment would still let "/note @agent ..." reach an agent
-	// through the mention path.
-	if isNoteComment(comment.Content) {
+func (h *Handler) triggerTasksForComment(ctx context.Context, issue db.Issue, comment db.Comment, parentComment *db.Comment, actorType, actorID string, suppressTriggers bool) {
+	// "Visible but no wake": a request-body suppress_triggers flag (CLI
+	// --no-trigger) or the legacy /note content prefix records the comment like
+	// any other comment but must not wake ANY agent. This guard lives at the
+	// single chokepoint so it covers all three trigger paths below (assignee,
+	// squad leader, and @mentioned agents). Gating only shouldEnqueueOnComment
+	// would still let "@agent ..." reach an agent through the mention path.
+	//
+	// suppress_triggers is the authoritative request-body switch; the /note
+	// prefix is kept only as a backward-compatible shortcut and is NOT a
+	// substitute for it.
+	if suppressTriggers || isNoteComment(comment.Content) {
 		return
 	}
 
@@ -1260,8 +1270,9 @@ func (h *Handler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Content       string    `json:"content"`
-		AttachmentIDs *[]string `json:"attachment_ids"`
+		Content          string    `json:"content"`
+		AttachmentIDs    *[]string `json:"attachment_ids"`
+		SuppressTriggers bool      `json:"suppress_triggers"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -1339,7 +1350,7 @@ func (h *Handler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			h.triggerTasksForComment(r.Context(), issue, comment, parentComment, actorType, actorID)
+			h.triggerTasksForComment(r.Context(), issue, comment, parentComment, actorType, actorID, req.SuppressTriggers)
 		}
 	}
 
