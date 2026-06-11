@@ -11,13 +11,15 @@ describe("checkQuickCreateCliVersion", () => {
     expect(checkQuickCreateCliVersion("v0.2.15").state).toBe("too_old");
   });
 
-  it("returns missing for empty or unparsable input", () => {
+  it("returns missing for empty input", () => {
     expect(checkQuickCreateCliVersion("").state).toBe("missing");
     expect(checkQuickCreateCliVersion(undefined).state).toBe("missing");
-    expect(checkQuickCreateCliVersion("not-a-version").state).toBe("missing");
   });
 
-  it("treats git-describe dev builds as ok regardless of base tag", () => {
+  it("treats source/dev builds as ok regardless of release-like base tag", () => {
+    expect(checkQuickCreateCliVersion("dev").state).toBe("ok");
+    expect(checkQuickCreateCliVersion("not-a-version").state).toBe("ok");
+    expect(checkQuickCreateCliVersion("daf0e935").state).toBe("ok");
     expect(checkQuickCreateCliVersion("v0.2.15-235-gdaf0e935").state).toBe("ok");
     expect(checkQuickCreateCliVersion("v0.2.15-235-gdaf0e935-dirty").state).toBe("ok");
     expect(checkQuickCreateCliVersion("0.1.0-1-gabc1234").state).toBe("ok");
