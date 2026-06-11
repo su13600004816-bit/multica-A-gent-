@@ -61,3 +61,13 @@
 ## 11. 当前 multica 部署状态
 - 已上线：模块在 `packages/core/image-compress/`，接线在 `use-file-upload.ts`；镜像 `multica-web:canvas-photo-20260611` 已部署生产，DOCTOR_OK。
 - 分支：`fe-photo`（= 画布工作台线 + 本模块）。**注意：本储备包独立于该分支，不随分支变动。**
+
+## 12. 独立性铁规(苏总 2026-06-12)
+- **照片=独立文件包,家在主干 `main`**(commit 29a0bcac)。**绝不把照片贴进画布或任何功能分支**——画布一重建照片就被覆盖(canvas-wf10-photo 是反面教训)。
+- 规则:前端构建一律从 main 或 main 基线分支出 → 自动继承照片;画布/其它分支应 merge main 获得照片,不各自 bolt。
+- 线上 canvas-wf10-photo 是耦合版(可用),规范是后续让画布线 merge main 继承,逐步收敛。
+
+## 12. 独立性铁规(苏总 2026-06-12)
+- **照片 = 独立文件包,家在主干 `main`**(commit 29a0bcac)。**绝不把照片贴进画布或任何功能分支**——画布一重建照片就被覆盖(canvas-wf10-photo 是反面教训)。
+- 规则:前端构建一律从 main 或 main 基线分支出 → 自动继承照片;画布/其它分支应 merge main 获得照片,不各自 bolt。
+- 线上 canvas-wf10-photo 是耦合版(可用),规范是后续让画布线 merge main 继承,逐步收敛。
