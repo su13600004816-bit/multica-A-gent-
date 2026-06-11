@@ -1,0 +1,15 @@
+[Unit]
+Description=PL1 line watchdog (T01/T02/T03 squads) - patrol stuck/failed runs, post to PL-94 and route to crisis admin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=fleet
+Group=fleet
+Environment=HTTPS_PROXY=http://127.0.0.1:10808
+Environment=HTTP_PROXY=http://127.0.0.1:10808
+# 巡查+告警(贴到交接台 PL-94)+派单(新异常派给本线危机处理员)。与 run_watchdog.sh 一致。
+# 如需自动重启卡死/失败 run,在行尾加 --auto-rerun
+ExecStart=/usr/bin/python3 /home/fleet/line-config/line_watchdog.py --post --route
+Nice=5
