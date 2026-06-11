@@ -612,3 +612,137 @@ func TestCreateComment_SquadMentionTriggersLeader(t *testing.T) {
 		t.Fatalf("after @squad mention: expected 1 leader task, got %d", got)
 	}
 }
+
+// TestCreateComment_SuppressTriggersBlocksSquadLeader is the S2 regression
+// suite for PL-145/PL-170: the request-body suppress_triggers flag (CLI
+// --no-trigger) must stop the squad leader from being woken, across BOTH
+// wake paths that can reach EnqueueTaskForSquadLeader on a squad-assigned
+// issue:
+//
+//   - plain member comment → on-comment squad leader path
+//     (shouldEnqueueSquadLeaderOnComment → enqueueSquadLeaderTask)
+//   - member comment that @mentions a squad → @squad mention path
+//     (enqueueMentionedAgentTasks squad branch)
+//
+// Each scenario asserts the suppressed case enqueues ZERO leader tasks and
+// keeps a suppress_triggers=false negative control that DOES enqueue exactly
+// one leader task — proving suppression is what blocks the wake, not some
+// unrelated short-circuit. Both run the full CreateComment handler against
+// the real queue so they exercise EnqueueTaskForSquadLeader end to end.
+func TestCreateComment_SuppressTriggersBlocksSquadLeader(t *testing.T) {
+	if testHandler == nil || testPool == nil {
+		t.Skip("database not available")
+	}
+	ctx := context.Background()
+
+	// Counts queued leader tasks for the given fixture's issue+leader.
+	countLeaderQueued := func(fx squadCommentTriggerFixture) int {
+		var n int
+		if err := testPool.QueryRow(ctx,
+			`SELECT count(*) FROM agent_task_queue WHERE issue_id = $1 AND agent_id = $2 AND status = 'queued'`,
+			uuidToString(fx.Issue.ID), fx.LeaderID,
+		).Scan(&n); err != nil {
+			t.Fatalf("count leader tasks: %v", err)
+		}
+		return n
+	}
+
+	// Posts a member comment with the given body via the full handler and
+	// asserts a 201.
+	postComment := func(fx squadCommentTriggerFixture, content string, suppress bool) {
+		t.Helper()
+		issueID := uuidToString(fx.Issue.ID)
+		w := httptest.NewRecorder()
+		r := newRequest("POST", "/api/issues/"+issueID+"/comments", map[string]any{
+			"content":           content,
+			"suppress_triggers": suppress,
+		})
+		r = withURLParam(r, "id", issueID)
+		testHandler.CreateComment(w, r)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("CreateComment: expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// Resets the issue's queue and comments between the suppressed run and its
+	// control run so the per-comment single-execution lock and per-issue
+	// pending-task dedupe cannot make the control's wake look suppressed. The
+	// two runs share one fixture (one squad/leader/issue) because
+	// newSquadCommentTriggerFixture seeds a fixed-name "other" agent and cannot
+	// be called twice in the same test.
+	reset := func(fx squadCommentTriggerFixture) {
+		issueID := uuidToString(fx.Issue.ID)
+		if _, err := testPool.Exec(ctx, `DELETE FROM agent_task_queue WHERE issue_id = $1`, issueID); err != nil {
+			t.Fatalf("reset queue: %v", err)
+		}
+		if _, err := testPool.Exec(ctx, `DELETE FROM comment WHERE issue_id = $1`, issueID); err != nil {
+			t.Fatalf("reset comments: %v", err)
+		}
+	}
+
+	// runScenario posts the same comment first with suppress=true (must enqueue
+	// 0 leader tasks — the explicit assertion) then, after a queue reset, with
+	// suppress=false as the negative control (must enqueue exactly 1).
+	runScenario := func(t *testing.T, assertionLabel, content, pathDesc string) {
+		fx := newSquadCommentTriggerFixture(t)
+		t.Cleanup(func() { reset(fx) })
+
+		// Suppressed: leader must NOT be enqueued.
+		postComment(fx, content, true)
+		if got := countLeaderQueued(fx); got != 0 {
+			t.Fatalf("%s (suppress=true): expected 0 queued squad leader tasks, got %d — suppress_triggers did not gate the %s", assertionLabel, got, pathDesc)
+		}
+
+		// Negative control: same comment without suppression wakes the leader.
+		reset(fx)
+		postComment(fx, content, false)
+		if got := countLeaderQueued(fx); got != 1 {
+			t.Fatalf("control (suppress=false): expected 1 queued squad leader task, got %d — the %s must still reach the leader when not suppressed", got, pathDesc)
+		}
+	}
+
+	// ---- Scenario 1: plain member comment on a squad-assigned issue ----
+	// The on-comment squad leader path (shouldEnqueueSquadLeaderOnComment)
+	// returns true for a plain member comment, so the control wakes the
+	// leader; suppress_triggers must gate it at the chokepoint.
+	t.Run("plain member comment", func(t *testing.T) {
+		runScenario(t,
+			"EXPLICIT ASSERTION 1 (plain comment)",
+			"what is the latest on this?",
+			"on-comment squad leader path (EnqueueTaskForSquadLeader chokepoint)")
+	})
+
+	// ---- Scenario 2: member comment containing mention://squad/<uuid> ----
+	// A member @squad mention is suppressed on the on-comment path but routed
+	// to that squad's leader via the @mention path (enqueueMentionedAgentTasks).
+	// suppress_triggers must gate THAT path too.
+	t.Run("squad mention comment", func(t *testing.T) {
+		fx := newSquadCommentTriggerFixture(t)
+		t.Cleanup(func() {
+			issueID := uuidToString(fx.Issue.ID)
+			testPool.Exec(context.Background(), `DELETE FROM agent_task_queue WHERE issue_id = $1`, issueID)
+			testPool.Exec(context.Background(), `DELETE FROM comment WHERE issue_id = $1`, issueID)
+		})
+
+		content := "handing to [@Squad](mention://squad/" + fx.SquadID + ")"
+
+		// Suppressed: leader must NOT be enqueued via the @squad mention path.
+		postComment(fx, content, true)
+		if got := countLeaderQueued(fx); got != 0 {
+			t.Fatalf("EXPLICIT ASSERTION 2 (@squad mention, suppress=true): expected 0 queued squad leader tasks, got %d — suppress_triggers did not gate the @squad mention wake path", got)
+		}
+
+		// Negative control: same @squad mention without suppression reaches
+		// the leader via the mention path.
+		if _, err := testPool.Exec(ctx, `DELETE FROM agent_task_queue WHERE issue_id = $1`, uuidToString(fx.Issue.ID)); err != nil {
+			t.Fatalf("reset queue: %v", err)
+		}
+		if _, err := testPool.Exec(ctx, `DELETE FROM comment WHERE issue_id = $1`, uuidToString(fx.Issue.ID)); err != nil {
+			t.Fatalf("reset comments: %v", err)
+		}
+		postComment(fx, content, false)
+		if got := countLeaderQueued(fx); got != 1 {
+			t.Fatalf("control (@squad mention, suppress=false): expected 1 queued squad leader task, got %d — the @squad mention path must still reach the leader when not suppressed", got)
+		}
+	})
+}
