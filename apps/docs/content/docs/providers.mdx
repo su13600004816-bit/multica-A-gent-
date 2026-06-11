@@ -13,7 +13,7 @@ For guidance on picking a tool when creating an agent, see [Creating and configu
 
 | Tool | Vendor | Session resumption | MCP | Skill injection path | Model selection |
 |---|---|---|---|---|---|
-| **Antigravity** | Google | ✅ (`--conversation <id>`) | ❌ | `.agents/skills/` | Managed inside the Antigravity CLI itself |
+| **Antigravity** | Google | ✅ (`--conversation <id>`) | ❌ | `.agents/skills/` | Dynamic discovery (`agy models`) |
 | **Claude Code** | Anthropic | ✅ | ✅ | `.claude/skills/` | Static + flag |
 | **Codex** | OpenAI | ⚠️ Code exists but unreachable | ✅ | `$CODEX_HOME/skills/` | Static |
 | **Copilot** | GitHub | ✅ | ❌ | `.github/skills/` | Static (determined by account entitlement) |
@@ -22,7 +22,7 @@ For guidance on picking a tool when creating an agent, see [Creating and configu
 | **Hermes** | Nous Research | ✅ | ✅ | `.agent_context/skills/` (fallback) | Dynamic discovery |
 | **Kimi** | Moonshot | ✅ | ✅ | `.kimi/skills/` | Dynamic discovery |
 | **Kiro CLI** | Amazon | ✅ | ✅ | `.kiro/skills/` | Dynamic discovery |
-| **OpenCode** | SST | ✅ | ✅ | `.opencode/skills/` | Dynamic discovery |
+| **OpenCode** | SST | ✅ | ✅ | `.opencode/skills/` | Dynamic discovery + variants |
 | **OpenClaw** | Open source | ✅ | ✅ | `.agent_context/skills/` (fallback) | Bound to the agent, can't be switched per task |
 | **Pi** | Inflection AI | ✅ (session is a file path) | ❌ | `.pi/skills/` | Dynamic discovery |
 
@@ -30,7 +30,7 @@ For guidance on picking a tool when creating an agent, see [Creating and configu
 
 ### Antigravity
 
-From Google. CLI binary name is `agy`. Pairs with Google's Antigravity service and ships with a Gemini-backed default model. **Session resumption works** via `--conversation <id>`; the daemon captures the conversation UUID from the CLI's log file because stdout is plain text rather than a structured event stream. There is no `--model` flag — model selection lives inside the Antigravity CLI settings, so Multica disables the per-agent model picker for this provider. Skills land in `.agents/skills/` (the CLI inherits Gemini CLI's workspace skill layout — see [Antigravity migration docs](https://antigravity.google/docs/gcli-migration)).
+From Google. CLI binary name is `agy`. Pairs with Google's Antigravity service and ships with a Gemini-backed default model. **Session resumption works** via `--conversation <id>`; the daemon captures the conversation UUID from the CLI's log file because stdout is plain text rather than a structured event stream. **Model selection works** via the `--model` flag (added in agy 1.0.6): the daemon enumerates the catalog with `agy models` and ships the chosen value verbatim. Note these are human display strings such as `Claude Opus 4.6 (Thinking)`, not `provider/model` slugs — and agy silently no-ops on a value it doesn't recognise, so prefer picking from the discovered list over typing a custom one. Skills land in `.agents/skills/` (the CLI inherits Gemini CLI's workspace skill layout — see [Antigravity migration docs](https://antigravity.google/docs/gcli-migration)).
 
 ### Claude Code
 
@@ -66,7 +66,7 @@ From Amazon. Uses ACP over stdio via `kiro-cli acp`. Session resumption works th
 
 ### OpenCode
 
-From SST, open source. Dynamically discovers available models (scans the CLI's configuration file). Session resumption works, and it consumes the agent's `mcp_config` field — Multica injects it inline through the `OPENCODE_CONFIG_CONTENT` environment variable, so the agent's MCP servers reach OpenCode without writing anything into the task workdir's `opencode.json` (the agent or the user keep ownership of that file). **Suitable for tinkerers who want to customize their model catalog.**
+From SST, open source. Dynamically discovers available models and model variants (scans the CLI's configuration file). Session resumption works, and it consumes the agent's `mcp_config` field — Multica injects it inline through the `OPENCODE_CONFIG_CONTENT` environment variable, so the agent's MCP servers reach OpenCode without writing anything into the task workdir's `opencode.json` (the agent or the user keep ownership of that file). When a model exposes variants, Multica shows them as the agent thinking selector and passes the selected value through `opencode run --variant`. **Suitable for tinkerers who want to customize their model catalog.**
 
 ### OpenClaw
 

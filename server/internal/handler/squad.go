@@ -10,6 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/multica-ai/multica/server/internal/analytics"
+	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/util"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
@@ -268,6 +270,12 @@ func (h *Handler) CreateSquad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.publish(protocol.EventSquadCreated, workspaceID, "member", uuidToString(member.UserID), map[string]any{"squad": resp})
+	obsmetrics.RecordEvent(h.Analytics, h.Metrics, analytics.SquadCreated(
+		uuidToString(member.UserID),
+		workspaceID,
+		uuidToString(squad.ID),
+		1,
+	))
 	writeJSON(w, http.StatusCreated, resp)
 }
 
@@ -463,7 +471,7 @@ type SquadMemberStatusListResponse struct {
 	Members []SquadMemberStatusResponse `json:"members"`
 }
 
-// deriveSquadMemberStatus collapses runtime + task signals into the four
+// deriveSquadMemberStatus collapses runtime + task signals into the five
 // status buckets used by the squad UI. Mirrors the workload+availability
 // split in packages/core/agents/derive-presence.ts: working wins over
 // runtime health (an agent that is in the middle of dispatched/running
@@ -474,9 +482,11 @@ type SquadMemberStatusListResponse struct {
 // last_seen_at is within the last 5 minutes is reported as "unstable" so
 // the squad UI surfaces transient drops the same way the agent dot does.
 //
-// Archived agents always report `offline` regardless of any leftover
+// Archived agents always report `archived` regardless of any leftover
 // runtime row or task — they should appear in the list but never look
-// like they're still working. Per the RFC decision (see MUL-2319), we
+// like they're still working or merely offline (a leftover online
+// runtime row would otherwise read as "offline" and hide the fact that
+// the agent has been archived). Per the RFC decision (see MUL-2319), we
 // surface archived agents in this endpoint rather than filtering them
 // out in the SQL.
 func deriveSquadMemberStatus(
@@ -487,7 +497,7 @@ func deriveSquadMemberStatus(
 	now time.Time,
 ) string {
 	if archived {
-		return "offline"
+		return "archived"
 	}
 	if hasActiveTask {
 		return "working"
@@ -985,11 +995,49 @@ func commentMentionsAnyone(content string) bool {
 // trigger the squad leader. Mirrors shouldEnqueueAgentTask: backlog issues
 // are skipped (parking lot), and the leader agent must have a runtime and
 // not be archived.
-func (h *Handler) shouldEnqueueSquadLeaderOnAssign(ctx context.Context, issue db.Issue) bool {
+//
+// Self-trigger guard (assign path, conflict D): when the actor performing the
+// assignment IS the squad's own leader agent, the assignment would make the
+// leader dispatch itself (leader creates/assigns an issue onto its own squad →
+// it gets enqueued as leader of that same squad). This is the assign-path
+// analogue of the comment-path lastTaskWasLeader guard in
+// shouldEnqueueSquadLeaderOnComment. The two paths keep independent rules: the
+// comment guard is role-aware (a leader acting as worker must still wake the
+// leader role), whereas the assign guard keys purely on actor identity — a
+// leader assigning work onto its own squad is always self-dispatch and must
+// not auto-fire. A human, or any agent other than this squad's leader, still
+// triggers the leader normally.
+func (h *Handler) shouldEnqueueSquadLeaderOnAssign(ctx context.Context, issue db.Issue, actorType, actorID string) bool {
 	if issue.Status == "backlog" {
 		return false
 	}
+	if h.actorIsSquadLeader(ctx, issue, actorType, actorID) {
+		return false
+	}
 	return h.isSquadLeaderReady(ctx, issue)
+}
+
+// actorIsSquadLeader reports whether the acting agent is the leader of the
+// squad the issue is assigned to. Used by the assign-path self-trigger guard
+// to stop a squad leader from auto-dispatching itself when it assigns work
+// onto its own squad. Returns false for member actors, non-squad issues, and
+// any lookup error (fail-open: only an unambiguous self-assign suppresses the
+// trigger).
+func (h *Handler) actorIsSquadLeader(ctx context.Context, issue db.Issue, actorType, actorID string) bool {
+	if actorType != "agent" {
+		return false
+	}
+	if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+		return false
+	}
+	squad, err := h.Queries.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
+		ID:          issue.AssigneeID,
+		WorkspaceID: issue.WorkspaceID,
+	})
+	if err != nil {
+		return false
+	}
+	return actorID == uuidToString(squad.LeaderID)
 }
 
 // isSquadLeaderReady returns true when the issue is assigned to a squad whose
@@ -1031,12 +1079,29 @@ func (h *Handler) enqueueSquadLeaderTask(ctx context.Context, issue db.Issue, tr
 		return
 	}
 
+	// Private-leader gate: deny if the actor cannot access the leader.
+	if !h.canEnqueueSquadLeader(ctx, squad.LeaderID, authorType, authorID, uuidToString(issue.WorkspaceID)) {
+		return
+	}
+
 	// Dedup: skip if leader already has a pending task for this issue.
 	hasPending, err := h.Queries.HasPendingTaskForIssueAndAgent(ctx, db.HasPendingTaskForIssueAndAgentParams{
 		IssueID: issue.ID,
 		AgentID: squad.LeaderID,
 	})
 	if err != nil || hasPending {
+		return
+	}
+
+	// Single-execution lock: a given comment must not enqueue more than one
+	// leader run, even after a prior one completed or the watchdog re-routes
+	// onto the same PASS comment. This is the structural guard against the
+	// comment→leader→...→comment storm.
+	hasTriggered, err := h.Queries.HasTaskForTriggerCommentAndAgent(ctx, db.HasTaskForTriggerCommentAndAgentParams{
+		TriggerCommentID: triggerCommentID,
+		AgentID:          squad.LeaderID,
+	})
+	if err != nil || hasTriggered {
 		return
 	}
 

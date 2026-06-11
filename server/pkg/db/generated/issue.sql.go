@@ -181,21 +181,21 @@ INSERT INTO issue (
 `
 
 type CreateIssueParams struct {
-	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
-	Title         string             `json:"title"`
-	Description   pgtype.Text        `json:"description"`
-	Status        string             `json:"status"`
-	Priority      string             `json:"priority"`
-	AssigneeType  pgtype.Text        `json:"assignee_type"`
-	AssigneeID    pgtype.UUID        `json:"assignee_id"`
-	CreatorType   string             `json:"creator_type"`
-	CreatorID     pgtype.UUID        `json:"creator_id"`
-	ParentIssueID pgtype.UUID        `json:"parent_issue_id"`
-	Position      float64            `json:"position"`
-	StartDate     pgtype.Timestamptz `json:"start_date"`
-	DueDate       pgtype.Timestamptz `json:"due_date"`
-	Number        int32              `json:"number"`
-	ProjectID     pgtype.UUID        `json:"project_id"`
+	WorkspaceID   pgtype.UUID `json:"workspace_id"`
+	Title         string      `json:"title"`
+	Description   pgtype.Text `json:"description"`
+	Status        string      `json:"status"`
+	Priority      string      `json:"priority"`
+	AssigneeType  pgtype.Text `json:"assignee_type"`
+	AssigneeID    pgtype.UUID `json:"assignee_id"`
+	CreatorType   string      `json:"creator_type"`
+	CreatorID     pgtype.UUID `json:"creator_id"`
+	ParentIssueID pgtype.UUID `json:"parent_issue_id"`
+	Position      float64     `json:"position"`
+	StartDate     pgtype.Date `json:"start_date"`
+	DueDate       pgtype.Date `json:"due_date"`
+	Number        int32       `json:"number"`
+	ProjectID     pgtype.UUID `json:"project_id"`
 }
 
 func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error) {
@@ -259,23 +259,23 @@ INSERT INTO issue (
 `
 
 type CreateIssueWithOriginParams struct {
-	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
-	Title         string             `json:"title"`
-	Description   pgtype.Text        `json:"description"`
-	Status        string             `json:"status"`
-	Priority      string             `json:"priority"`
-	AssigneeType  pgtype.Text        `json:"assignee_type"`
-	AssigneeID    pgtype.UUID        `json:"assignee_id"`
-	CreatorType   string             `json:"creator_type"`
-	CreatorID     pgtype.UUID        `json:"creator_id"`
-	ParentIssueID pgtype.UUID        `json:"parent_issue_id"`
-	Position      float64            `json:"position"`
-	StartDate     pgtype.Timestamptz `json:"start_date"`
-	DueDate       pgtype.Timestamptz `json:"due_date"`
-	Number        int32              `json:"number"`
-	ProjectID     pgtype.UUID        `json:"project_id"`
-	OriginType    pgtype.Text        `json:"origin_type"`
-	OriginID      pgtype.UUID        `json:"origin_id"`
+	WorkspaceID   pgtype.UUID `json:"workspace_id"`
+	Title         string      `json:"title"`
+	Description   pgtype.Text `json:"description"`
+	Status        string      `json:"status"`
+	Priority      string      `json:"priority"`
+	AssigneeType  pgtype.Text `json:"assignee_type"`
+	AssigneeID    pgtype.UUID `json:"assignee_id"`
+	CreatorType   string      `json:"creator_type"`
+	CreatorID     pgtype.UUID `json:"creator_id"`
+	ParentIssueID pgtype.UUID `json:"parent_issue_id"`
+	Position      float64     `json:"position"`
+	StartDate     pgtype.Date `json:"start_date"`
+	DueDate       pgtype.Date `json:"due_date"`
+	Number        int32       `json:"number"`
+	ProjectID     pgtype.UUID `json:"project_id"`
+	OriginType    pgtype.Text `json:"origin_type"`
+	OriginID      pgtype.UUID `json:"origin_id"`
 }
 
 func (q *Queries) CreateIssueWithOrigin(ctx context.Context, arg CreateIssueWithOriginParams) (Issue, error) {
@@ -821,8 +821,8 @@ type ListIssuesRow struct {
 	CreatorID     pgtype.UUID        `json:"creator_id"`
 	ParentIssueID pgtype.UUID        `json:"parent_issue_id"`
 	Position      float64            `json:"position"`
-	StartDate     pgtype.Timestamptz `json:"start_date"`
-	DueDate       pgtype.Timestamptz `json:"due_date"`
+	StartDate     pgtype.Date        `json:"start_date"`
+	DueDate       pgtype.Date        `json:"due_date"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	Number        int32              `json:"number"`
@@ -961,8 +961,8 @@ type ListOpenIssuesRow struct {
 	CreatorID     pgtype.UUID        `json:"creator_id"`
 	ParentIssueID pgtype.UUID        `json:"parent_issue_id"`
 	Position      float64            `json:"position"`
-	StartDate     pgtype.Timestamptz `json:"start_date"`
-	DueDate       pgtype.Timestamptz `json:"due_date"`
+	StartDate     pgtype.Date        `json:"start_date"`
+	DueDate       pgtype.Date        `json:"due_date"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	Number        int32              `json:"number"`
@@ -1138,18 +1138,18 @@ RETURNING id, workspace_id, title, description, status, priority, assignee_type,
 `
 
 type UpdateIssueParams struct {
-	ID            pgtype.UUID        `json:"id"`
-	Title         pgtype.Text        `json:"title"`
-	Description   pgtype.Text        `json:"description"`
-	Status        pgtype.Text        `json:"status"`
-	Priority      pgtype.Text        `json:"priority"`
-	AssigneeType  pgtype.Text        `json:"assignee_type"`
-	AssigneeID    pgtype.UUID        `json:"assignee_id"`
-	Position      pgtype.Float8      `json:"position"`
-	StartDate     pgtype.Timestamptz `json:"start_date"`
-	DueDate       pgtype.Timestamptz `json:"due_date"`
-	ParentIssueID pgtype.UUID        `json:"parent_issue_id"`
-	ProjectID     pgtype.UUID        `json:"project_id"`
+	ID            pgtype.UUID   `json:"id"`
+	Title         pgtype.Text   `json:"title"`
+	Description   pgtype.Text   `json:"description"`
+	Status        pgtype.Text   `json:"status"`
+	Priority      pgtype.Text   `json:"priority"`
+	AssigneeType  pgtype.Text   `json:"assignee_type"`
+	AssigneeID    pgtype.UUID   `json:"assignee_id"`
+	Position      pgtype.Float8 `json:"position"`
+	StartDate     pgtype.Date   `json:"start_date"`
+	DueDate       pgtype.Date   `json:"due_date"`
+	ParentIssueID pgtype.UUID   `json:"parent_issue_id"`
+	ProjectID     pgtype.UUID   `json:"project_id"`
 }
 
 func (q *Queries) UpdateIssue(ctx context.Context, arg UpdateIssueParams) (Issue, error) {
@@ -1209,6 +1209,35 @@ type UpdateIssueStatusParams struct {
 	ID          pgtype.UUID `json:"id"`
 	Status      string      `json:"status"`
 	WorkspaceID pgtype.UUID `json:"workspace_id"`
+}
+
+const updateIssueStatusIfCurrent = `-- name: UpdateIssueStatusIfCurrent :execrows
+UPDATE issue SET
+    status = $1,
+    updated_at = now()
+WHERE id = $2 AND workspace_id = $3 AND status = $4
+`
+
+type UpdateIssueStatusIfCurrentParams struct {
+	NewStatus      string      `json:"new_status"`
+	ID             pgtype.UUID `json:"id"`
+	WorkspaceID    pgtype.UUID `json:"workspace_id"`
+	ExpectedStatus string      `json:"expected_status"`
+}
+
+// Compare-and-swap on issue status: flip to new_status only when the issue is
+// STILL at expected_status. Returns the number of rows updated (0 when the
+// status moved out from under us). The watchdog/runtime sweeper uses this to
+// roll a stuck issue back to 'todo' without clobbering a terminal status the
+// squad leader wrote concurrently between our read and our write (conflict A/C:
+// a stale timeout-driven reset must never overwrite a fresh event-driven
+// 'done'/'cancelled'). Workspace_id is the SQL-layer tenant guard.
+func (q *Queries) UpdateIssueStatusIfCurrent(ctx context.Context, arg UpdateIssueStatusIfCurrentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateIssueStatusIfCurrent, arg.NewStatus, arg.ID, arg.WorkspaceID, arg.ExpectedStatus)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 // Workspace_id in the WHERE clause is a SQL-layer tenant guard; see DeleteIssue.

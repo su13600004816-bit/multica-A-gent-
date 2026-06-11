@@ -523,6 +523,115 @@ func TestCreateIssueExplicitBacklogPreserved(t *testing.T) {
 	testHandler.DeleteIssue(httptest.NewRecorder(), cleanupReq)
 }
 
+// TestCreateIssueRejectsCrossWorkspaceParent guards the workspace
+// boundary check that lives in service.IssueService.Create. A request
+// that pins parent_issue_id to an issue in a foreign workspace must be
+// rejected before the row is created — this is the structural reason
+// IssueService owns the parent lookup (not the HTTP handler). The test
+// inserts a foreign workspace + issue directly via SQL, then drives the
+// request through the regular handler entry point.
+func TestCreateIssueRejectsCrossWorkspaceParent(t *testing.T) {
+	ctx := context.Background()
+
+	var otherWorkspaceID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO workspace (name, slug, description, issue_prefix)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`, "Cross-workspace parent test", "xwp-parent-test", "Foreign workspace", "XWP").Scan(&otherWorkspaceID); err != nil {
+		t.Fatalf("insert foreign workspace: %v", err)
+	}
+	t.Cleanup(func() {
+		testPool.Exec(ctx, `DELETE FROM workspace WHERE id = $1`, otherWorkspaceID)
+	})
+
+	var foreignParentID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO issue (workspace_id, title, status, priority, creator_type, creator_id, number)
+		VALUES ($1, $2, 'todo', 'none', 'member', $3, 1)
+		RETURNING id
+	`, otherWorkspaceID, "Foreign parent", testUserID).Scan(&foreignParentID); err != nil {
+		t.Fatalf("insert foreign parent: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":           "Should be rejected",
+		"parent_issue_id": foreignParentID,
+	})
+	testHandler.CreateIssue(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CreateIssue with foreign parent: expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "parent issue not found in this workspace") {
+		t.Fatalf("CreateIssue with foreign parent: expected boundary error message, got %s", w.Body.String())
+	}
+
+	var count int
+	if err := testPool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM issue WHERE workspace_id = $1 AND title = $2`,
+		testWorkspaceID, "Should be rejected",
+	).Scan(&count); err != nil {
+		t.Fatalf("count query: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("rejected create still wrote a row (count=%d) — service-layer boundary check failed", count)
+	}
+}
+
+// TestCreateIssueRejectsCrossWorkspaceProject mirrors the parent test for
+// the project workspace boundary. Same reasoning: future create entries
+// (Lark /issue, MCP, API keys) must inherit this guard from the service
+// without re-implementing it.
+func TestCreateIssueRejectsCrossWorkspaceProject(t *testing.T) {
+	ctx := context.Background()
+
+	var otherWorkspaceID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO workspace (name, slug, description, issue_prefix)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`, "Cross-workspace project test", "xwp-project-test", "Foreign workspace", "XWP").Scan(&otherWorkspaceID); err != nil {
+		t.Fatalf("insert foreign workspace: %v", err)
+	}
+	t.Cleanup(func() {
+		testPool.Exec(ctx, `DELETE FROM workspace WHERE id = $1`, otherWorkspaceID)
+	})
+
+	var foreignProjectID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO project (workspace_id, title, status, priority)
+		VALUES ($1, $2, 'planned', 'none')
+		RETURNING id
+	`, otherWorkspaceID, "Foreign project").Scan(&foreignProjectID); err != nil {
+		t.Fatalf("insert foreign project: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":      "Should be rejected",
+		"project_id": foreignProjectID,
+	})
+	testHandler.CreateIssue(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CreateIssue with foreign project: expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "project not found in this workspace") {
+		t.Fatalf("CreateIssue with foreign project: expected boundary error message, got %s", w.Body.String())
+	}
+
+	var count int
+	if err := testPool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM issue WHERE workspace_id = $1 AND title = $2`,
+		testWorkspaceID, "Should be rejected",
+	).Scan(&count); err != nil {
+		t.Fatalf("count query: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("rejected create still wrote a row (count=%d) — service-layer boundary check failed", count)
+	}
+}
+
 func TestCreateSubIssueInheritsParentProject(t *testing.T) {
 	var projectID, parentID, childID string
 	defer func() {
@@ -1841,6 +1950,145 @@ func TestSetAgentSkillsRejectsMalformedSkillID(t *testing.T) {
 	testHandler.SetAgentSkills(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("SetAgentSkills: expected 400 for malformed skill_ids, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddAgentSkillsPreservesExistingAssignments(t *testing.T) {
+	agentID := createHandlerTestAgent(t, "Handler Add Skill Preserves Existing", nil)
+	existingSkillID := insertHandlerTestSkill(t, "add-preserve-existing", "existing body")
+	newSkillID := insertHandlerTestSkill(t, "add-preserve-new", "new body")
+
+	if _, err := testPool.Exec(context.Background(),
+		`INSERT INTO agent_skill (agent_id, skill_id) VALUES ($1, $2)`,
+		agentID, existingSkillID,
+	); err != nil {
+		t.Fatalf("seed existing skill assignment: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/agents/"+agentID+"/skills/add", map[string]any{
+		"skill_ids": []string{newSkillID},
+	})
+	req = withURLParam(req, "id", agentID)
+	testHandler.AddAgentSkills(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("AddAgentSkills: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp []SkillSummaryResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	assertSkillIDsPresent(t, resp, existingSkillID, newSkillID)
+	assertAgentSkillRowCount(t, agentID, 2)
+}
+
+func TestAddAgentSkillsAddsMultipleAndIsIdempotent(t *testing.T) {
+	agentID := createHandlerTestAgent(t, "Handler Add Multiple Skills", nil)
+	skillA := insertHandlerTestSkill(t, "add-multiple-a", "a body")
+	skillB := insertHandlerTestSkill(t, "add-multiple-b", "b body")
+
+	for attempt := 0; attempt < 2; attempt++ {
+		w := httptest.NewRecorder()
+		req := newRequest("POST", "/api/agents/"+agentID+"/skills/add", map[string]any{
+			"skill_ids": []string{skillA, skillB},
+		})
+		req = withURLParam(req, "id", agentID)
+		testHandler.AddAgentSkills(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("AddAgentSkills attempt %d: expected 200, got %d: %s", attempt+1, w.Code, w.Body.String())
+		}
+	}
+
+	assertAgentSkillRowCount(t, agentID, 2)
+}
+
+func TestAddAgentSkillsRejectsMalformedSkillID(t *testing.T) {
+	agentID := createHandlerTestAgent(t, "Handler Add Malformed Skill Assignment", nil)
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/agents/"+agentID+"/skills/add", map[string]any{
+		"skill_ids": []string{"not-a-uuid"},
+	})
+	req = withURLParam(req, "id", agentID)
+	testHandler.AddAgentSkills(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("AddAgentSkills: expected 400 for malformed skill_ids, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAddAgentSkillsRejectsCrossWorkspaceSkillID(t *testing.T) {
+	agentID := createHandlerTestAgent(t, "Handler Add Cross Workspace Skill", nil)
+	foreignSkillID := insertHandlerTestSkillInForeignWorkspace(t, "add-cross-workspace", "foreign body")
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/agents/"+agentID+"/skills/add", map[string]any{
+		"skill_ids": []string{foreignSkillID},
+	})
+	req = withURLParam(req, "id", agentID)
+	testHandler.AddAgentSkills(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("AddAgentSkills: expected 404 for cross-workspace skill_id, got %d: %s", w.Code, w.Body.String())
+	}
+	assertAgentSkillRowCount(t, agentID, 0)
+}
+
+func insertHandlerTestSkillInForeignWorkspace(t *testing.T, namePrefix, content string) string {
+	t.Helper()
+	ctx := context.Background()
+	slug := "foreign-skill-" + strings.ToLower(strings.ReplaceAll(t.Name(), "_", "-"))
+
+	var workspaceID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO workspace (name, slug, description, issue_prefix)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`, "Foreign Skill Workspace "+t.Name(), slug, "", "FSW").Scan(&workspaceID); err != nil {
+		t.Fatalf("insert foreign workspace: %v", err)
+	}
+	t.Cleanup(func() {
+		testPool.Exec(context.Background(), `DELETE FROM workspace WHERE id = $1`, workspaceID)
+	})
+
+	name := namePrefix + "-" + t.Name()
+	var skillID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO skill (workspace_id, name, description, content, config, created_by)
+		VALUES ($1, $2, $3, $4, '{}'::jsonb, $5)
+		RETURNING id
+	`, workspaceID, name, "fixture", content, testUserID).Scan(&skillID); err != nil {
+		t.Fatalf("insert foreign skill: %v", err)
+	}
+	t.Cleanup(func() {
+		testPool.Exec(context.Background(), `DELETE FROM skill WHERE id = $1`, skillID)
+	})
+	return skillID
+}
+
+func assertSkillIDsPresent(t *testing.T, skills []SkillSummaryResponse, wantIDs ...string) {
+	t.Helper()
+	got := make(map[string]bool, len(skills))
+	for _, s := range skills {
+		got[s.ID] = true
+	}
+	for _, want := range wantIDs {
+		if !got[want] {
+			t.Fatalf("response missing skill %s; got %+v", want, skills)
+		}
+	}
+}
+
+func assertAgentSkillRowCount(t *testing.T, agentID string, want int) {
+	t.Helper()
+	var got int
+	if err := testPool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM agent_skill WHERE agent_id = $1`,
+		agentID,
+	).Scan(&got); err != nil {
+		t.Fatalf("count agent_skill: %v", err)
+	}
+	if got != want {
+		t.Fatalf("agent_skill row count: got %d, want %d", got, want)
 	}
 }
 
@@ -3468,5 +3716,191 @@ func TestAgentExplicitMentionStillTriggers(t *testing.T) {
 	}
 	if got := countTasks(agentA); got != 0 {
 		t.Fatalf("expected 0 tasks for Agent A (no self-trigger on own mention), got %d", got)
+	}
+}
+
+func TestCreateSkillSkipsSkillMdFile(t *testing.T) {
+	if testPool == nil {
+		t.Skip("no database available")
+	}
+
+	req := newRequest(http.MethodPost, "/api/workspaces/"+testWorkspaceID+"/skills", CreateSkillRequest{
+		Name:    "test-skill-create-skip-skillmd",
+		Content: "# SKILL.md content",
+		Files: []CreateSkillFileRequest{
+			{Path: "README.md", Content: "readme"},
+			{Path: "SKILL.md", Content: "should be skipped"},
+			{Path: "helper.go", Content: "package main"},
+		},
+	})
+	rec := httptest.NewRecorder()
+	testHandler.CreateSkill(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp SkillWithFilesResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	// Should only have README.md and helper.go, not SKILL.md
+	if len(resp.Files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(resp.Files))
+	}
+	for _, f := range resp.Files {
+		if strings.EqualFold(f.Path, "SKILL.md") {
+			t.Fatalf("SKILL.md should not be in response files")
+		}
+	}
+
+	// Verify DB state directly
+	ctx := context.Background()
+	rows, err := testPool.Query(ctx, "SELECT path FROM skill_file WHERE skill_id = $1", resp.ID)
+	if err != nil {
+		t.Fatalf("query skill_file: %v", err)
+	}
+	defer rows.Close()
+
+	var paths []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			t.Fatalf("scan path: %v", err)
+		}
+		paths = append(paths, p)
+	}
+	if len(paths) != 2 {
+		t.Fatalf("expected 2 rows in skill_file, got %d", len(paths))
+	}
+	for _, p := range paths {
+		if strings.EqualFold(p, "SKILL.md") {
+			t.Fatalf("SKILL.md should not be stored in skill_file")
+		}
+	}
+}
+
+func TestUpdateSkillSkipsSkillMdFile(t *testing.T) {
+	if testPool == nil {
+		t.Skip("no database available")
+	}
+
+	// Create a skill first
+	req := newRequest(http.MethodPost, "/api/workspaces/"+testWorkspaceID+"/skills", CreateSkillRequest{
+		Name:    "test-skill-update-skip-skillmd",
+		Content: "# SKILL.md content",
+		Files: []CreateSkillFileRequest{
+			{Path: "README.md", Content: "readme"},
+		},
+	})
+	rec := httptest.NewRecorder()
+	testHandler.CreateSkill(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create skill: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var createResp SkillWithFilesResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal create response: %v", err)
+	}
+
+	// Update with SKILL.md in files
+	updateReq := newRequest(http.MethodPut, "/api/skills/"+createResp.ID, UpdateSkillRequest{
+		Name:    strPtr("updated-name"),
+		Content: strPtr("updated content"),
+		Files: []CreateSkillFileRequest{
+			{Path: "README.md", Content: "updated readme"},
+			{Path: "SKILL.md", Content: "should be skipped"},
+			{Path: "new.go", Content: "package main"},
+		},
+	})
+	updateReq = withURLParam(updateReq, "id", createResp.ID)
+	updateRec := httptest.NewRecorder()
+	testHandler.UpdateSkill(updateRec, updateReq)
+
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("update skill: expected 200, got %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+
+	var updateResp SkillWithFilesResponse
+	if err := json.Unmarshal(updateRec.Body.Bytes(), &updateResp); err != nil {
+		t.Fatalf("unmarshal update response: %v", err)
+	}
+
+	if len(updateResp.Files) != 2 {
+		t.Fatalf("expected 2 files after update, got %d", len(updateResp.Files))
+	}
+	for _, f := range updateResp.Files {
+		if strings.EqualFold(f.Path, "SKILL.md") {
+			t.Fatalf("SKILL.md should not be in updated response files")
+		}
+	}
+
+	// Verify DB state
+	ctx := context.Background()
+	rows, err := testPool.Query(ctx, "SELECT path FROM skill_file WHERE skill_id = $1", createResp.ID)
+	if err != nil {
+		t.Fatalf("query skill_file: %v", err)
+	}
+	defer rows.Close()
+
+	var paths []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			t.Fatalf("scan path: %v", err)
+		}
+		paths = append(paths, p)
+	}
+	if len(paths) != 2 {
+		t.Fatalf("expected 2 rows in skill_file after update, got %d", len(paths))
+	}
+	for _, p := range paths {
+		if strings.EqualFold(p, "SKILL.md") {
+			t.Fatalf("SKILL.md should not be stored in skill_file after update")
+		}
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func TestUpsertSkillFileRejectsSkillMd(t *testing.T) {
+	if testPool == nil {
+		t.Skip("no database available")
+	}
+
+	// Create a skill first
+	req := newRequest(http.MethodPost, "/api/workspaces/"+testWorkspaceID+"/skills", CreateSkillRequest{
+		Name:    "test-skill-upsert-reject-skillmd",
+		Content: "# SKILL.md content",
+	})
+	rec := httptest.NewRecorder()
+	testHandler.CreateSkill(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create skill: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var createResp SkillWithFilesResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal create response: %v", err)
+	}
+
+	// Try to upsert SKILL.md
+	upsertReq := newRequest(http.MethodPut, "/api/skills/"+createResp.ID+"/files", CreateSkillFileRequest{
+		Path:    "SKILL.md",
+		Content: "should be rejected",
+	})
+	upsertReq = withURLParam(upsertReq, "id", createResp.ID)
+	upsertRec := httptest.NewRecorder()
+	testHandler.UpsertSkillFile(upsertRec, upsertReq)
+
+	if upsertRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", upsertRec.Code, upsertRec.Body.String())
+	}
+	if !strings.Contains(upsertRec.Body.String(), "SKILL.md is reserved") {
+		t.Fatalf("expected error message about reserved SKILL.md, got: %s", upsertRec.Body.String())
 	}
 }

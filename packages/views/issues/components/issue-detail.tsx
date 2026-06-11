@@ -44,6 +44,7 @@ import { ActorAvatar } from "../../common/actor-avatar";
 import { PropRow } from "../../common/prop-row";
 import type { Attachment, Issue, IssueStatus, IssuePriority, TimelineEntry, UpdateIssueRequest } from "@multica/core/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@multica/core/issues/config";
+import { formatDateOnly } from "@multica/core/issues/date";
 import { useUpdateIssue } from "@multica/core/issues/mutations";
 import { toast } from "sonner";
 import { StatusIcon, PriorityIcon, StatusPicker, PriorityPicker, StartDatePicker, DueDatePicker, AssigneePicker, LabelPicker } from ".";
@@ -54,7 +55,7 @@ import { CommentCard } from "./comment-card";
 import { CommentInput } from "./comment-input";
 import { ResolvedThreadBar } from "./resolved-thread-bar";
 import { collectThreadReplies } from "./thread-utils";
-import { AgentLiveCard } from "./agent-live-card";
+import { IssueAgentHeaderChip } from "./issue-agent-header-chip";
 import { ExecutionLogSection } from "./execution-log-section";
 import { PullRequestList } from "./pull-request-list";
 import { useGitHubSettings } from "@multica/core/github";
@@ -63,6 +64,7 @@ import { useAuthStore } from "@multica/core/auth";
 import { useWorkspacePaths } from "@multica/core/paths";
 import { useActorName } from "@multica/core/workspace/hooks";
 import { useWorkspaceId } from "@multica/core/hooks";
+import { useRecentContextStore } from "@multica/core/chat";
 import { issueListOptions, issueDetailOptions, childIssuesOptions, issueUsageOptions, issueAttachmentsOptions } from "@multica/core/issues/queries";
 import { projectDetailOptions } from "@multica/core/projects/queries";
 import { ProjectIcon } from "../../projects/components/project-icon";
@@ -168,10 +170,7 @@ function SubscriberPopoverContent({
 
 function shortDate(date: string | null): string {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+  return formatDateOnly(date, { month: "short", day: "numeric" }, "en-US");
 }
 
 type ActivityT = ReturnType<typeof useT<"issues">>["t"];
@@ -221,12 +220,12 @@ function formatActivity(
     }
     case "start_date_changed": {
       if (!details.to) return t(($) => $.activity.start_date_removed);
-      const formatted = new Date(details.to).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const formatted = formatDateOnly(details.to, { month: "short", day: "numeric" }, "en-US");
       return t(($) => $.activity.start_date_set, { date: formatted });
     }
     case "due_date_changed": {
       if (!details.to) return t(($) => $.activity.due_date_removed);
-      const formatted = new Date(details.to).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const formatted = formatDateOnly(details.to, { month: "short", day: "numeric" }, "en-US");
       return t(($) => $.activity.due_date_set, { date: formatted });
     }
     case "title_changed":
@@ -808,9 +807,17 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
 
   // Record recent visit
   const recordVisit = useRecentIssuesStore((s) => s.recordVisit);
+  const recordRecentContext = useRecentContextStore((s) => s.recordVisit);
   useEffect(() => {
     if (issue) {
       recordVisit(wsId, issue.id);
+      recordRecentContext(wsId, {
+        type: "issue",
+        id: issue.id,
+        label: issue.identifier,
+        subtitle: issue.title,
+        status: issue.status,
+      });
     }
   }, [issue?.id, wsId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1642,6 +1649,10 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
           }
           actions={
             <>
+            {/* Live "agent is working" chip, leftmost in the right cluster so
+                it never overlaps the title (which truncates to make room).
+                It self-hides when no agent is active. */}
+            <IssueAgentHeaderChip issueId={id} />
             {onDone && issue.status !== "done" && issue.status !== "cancelled" && (
               <Tooltip>
                 <TooltipTrigger
@@ -1938,13 +1949,11 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
 
             <LocalDirectoryHint projectId={issue?.project_id} />
 
-            {/* Agent live output — sticky banner in the activity section,
-                keyed by issue id so switching issues remounts the card and
-                clears any in-flight task state from the previous issue.
-                The execution log itself (per-task timeline + past runs)
-                lives in the right panel via ExecutionLogSection — this
-                card is just a header-style "agent is working" anchor. */}
-            <AgentLiveCard key={id} issueId={id} />
+            {/* The "agent is working" live signal now lives in the header
+                (IssueAgentHeaderChip) so it stays in one fixed place and
+                doesn't compete with sticky banners in this content column.
+                The per-task timeline + past runs live in the right panel
+                via ExecutionLogSection. */}
 
             {/* Timeline entries — virtualized via react-virtuoso to keep
                 first-paint cost O(viewport) instead of O(N). On a 500-comment

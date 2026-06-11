@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import type { ApiClient } from "../api/client";
 import type { Attachment } from "../types";
 import { MAX_FILE_SIZE } from "../constants/upload";
+import { compressImage } from "../image-compress";
 
 // Carries the full Attachment so editors that need preview metadata
 // (`content_type`, `download_url`) get it directly; `link` is kept as an
@@ -29,9 +30,21 @@ export function useFileUpload(
         throw new Error("File exceeds 100 MB limit");
       }
 
+      // 图片上传前压缩：长边压到 ≤1568px 并转 WebP（迁移自老站，为发给主脑降低 Vision token + 减小体积）。
+      // compressImage 对非图片/压缩失败会回退原文件（result.file 即原 File），保证绝不阻断上传。
+      let toUpload = file;
+      if (file.type.startsWith("image/")) {
+        try {
+          const result = await compressImage(file);
+          toUpload = result.file;
+        } catch {
+          toUpload = file;
+        }
+      }
+
       setUploading(true);
       try {
-        const att: Attachment = await api.uploadFile(file, {
+        const att: Attachment = await api.uploadFile(toUpload, {
           issueId: ctx?.issueId,
           commentId: ctx?.commentId,
           chatSessionId: ctx?.chatSessionId,
