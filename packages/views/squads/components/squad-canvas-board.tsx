@@ -371,16 +371,14 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
   // 只保留有对应成员的工序
   const steps = LINE_FLOW.filter((st) => byRole[st.role]);
   let y = 0;
-  const mainIds: string[] = [];
   steps.forEach((st, i) => {
     const mainM = byRole[st.role];
     if (!mainM) return;
     const id = `wf-m-${i}`;
-    mainIds.push(id);
     mkNode(id, mainM, st.label, WF_MAIN_X, y);
     if (i > 0) {
       const prev = steps[i - 1];
-      flowEdge(`wf-e-${i}`, mainIds[i - 1], id, prev.audit ? "✅合格" : undefined, false);
+      flowEdge(`wf-e-${i}`, `wf-m-${i - 1}`, id, prev?.audit ? "✅合格" : undefined, false);
     }
     // 审计/签收 → 返工模块(右,不合格)
     const midRole = st.reworkMid ?? "write";
