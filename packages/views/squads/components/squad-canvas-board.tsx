@@ -137,6 +137,20 @@ type SquadFlowNode = SquadRootNode | SquadMemberNode | FlowStepNode;
 
 const handleClass = "!h-2 !w-2 !border !border-border !bg-muted-foreground/40";
 
+// 四向连接点:左右走主流程(横向)、上分叉返工、下走收口尾巴。
+function NodeHandles() {
+  return (
+    <>
+      <Handle type="target" position={Position.Left} id="lt" className={handleClass} />
+      <Handle type="source" position={Position.Right} id="rs" className={handleClass} />
+      <Handle type="target" position={Position.Top} id="tt" className={handleClass} />
+      <Handle type="source" position={Position.Top} id="ts" className={handleClass} />
+      <Handle type="target" position={Position.Bottom} id="bt" className={handleClass} />
+      <Handle type="source" position={Position.Bottom} id="bs" className={handleClass} />
+    </>
+  );
+}
+
 // Leader chip — byte-for-byte the same chip SquadProfileCard renders (text-only,
 // no icon), so a leader reads identically on the canvas and in the squad card.
 const leaderChipClass =
@@ -151,7 +165,7 @@ function SquadRootNodeView({ data }: NodeProps<SquadRootNode>) {
       className="w-[216px] rounded-lg border bg-background px-4 py-3 shadow-sm"
       style={statusBorderStyle(data.status)}
     >
-      <Handle type="target" position={Position.Top} className={handleClass} />
+      <NodeHandles />
       <div className="flex items-center gap-3">
         <ActorAvatarBase
           name={data.name}
@@ -169,7 +183,7 @@ function SquadRootNodeView({ data }: NodeProps<SquadRootNode>) {
           </div>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className={handleClass} />
+      
     </div>
   );
 }
@@ -190,7 +204,7 @@ function SquadMemberNodeView({ data }: NodeProps<SquadMemberNode>) {
       }`}
       style={statusBorderStyle(data.status)}
     >
-      <Handle type="target" position={Position.Top} className={handleClass} />
+      <NodeHandles />
       <div className="flex items-center gap-2.5">
         <ActorAvatar
           actorType={data.memberType}
@@ -212,7 +226,7 @@ function SquadMemberNodeView({ data }: NodeProps<SquadMemberNode>) {
           </div>
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className={handleClass} />
+      
     </div>
   );
 }
@@ -244,7 +258,7 @@ function FlowStepNodeView({ id, data, selected }: NodeProps<FlowStepNode>) {
       }`}
       onDoubleClick={() => setEditing(true)}
     >
-      <Handle type="target" position={Position.Top} className={handleClass} />
+      <NodeHandles />
       {editing ? (
         <input
           autoFocus
@@ -263,7 +277,7 @@ function FlowStepNodeView({ id, data, selected }: NodeProps<FlowStepNode>) {
       ) : (
         <div className="truncate text-sm font-medium">{data.label}</div>
       )}
-      <Handle type="source" position={Position.Bottom} className={handleClass} />
+      
     </div>
   );
 }
@@ -279,47 +293,31 @@ const MEMBER_GAP_Y = 84;
 const COLUMN_X = 320;
 const ROOT_X = 0;
 
-// ============ 线小队生产线工作流布局引擎 ============
-// 把扁平成员列表排成「主流程竖向 + 审计左合格右不合格 + 返工模块回路」的流程图。
-const WF_GAP_Y = 96;
-const WF_MAIN_X = 0;
-const WF_REWORK_X = 340;
+// ============ 线小队生产线工作流布局引擎(横向主流程 + 返工上分叉 + 收口竖尾)============
+// 横向主流程从左往右;审计/签收不合格→上方返工链(深挖→返工写/优化→返工审计,绕回重走);
+// 合格→继续往右;末端主线签收→竖向收口(PR推送→危机→问题→记忆→看门狗停止)。
+const WF_HX = 250;
+const WF_VY = 120;
+const WF_ROW_Y = -150;
 
-function wfRoleOf(s: string): string | null {
-  if (/返工.*深挖|返工深挖/.test(s)) return "reworkDig";
-  if (/代码深挖|深挖/.test(s)) return "codeDig";
-  if (/主线主脑|主线|负责人|Leader/.test(s)) return "leader";
-  if (/写码|写代码/.test(s)) return "write";
-  if (/审计/.test(s)) return "audit";
-  if (/代码优化|优化/.test(s)) return "optimize";
-  if (/截图验/.test(s)) return "shotVerify";
-  if (/虚机验|虚拟机/.test(s)) return "vmVerify";
-  if (/拟人验|拟人/.test(s)) return "humanVerify";
-  if (/PR推送|推送/.test(s)) return "push";
-  if (/危机/.test(s)) return "crisis";
-  if (/记忆/.test(s)) return "memory";
-  if (/问题/.test(s)) return "problem";
-  if (/看门狗/.test(s)) return "watchdog";
-  return null;
-}
-
-// 主流程模板:role=角色,label=工序名,audit=判定节点(左合格右不合格),reworkMid=返工链中段角色
-const LINE_FLOW: Array<{ role: string; label: string; audit?: boolean; reworkMid?: string }> = [
-  { role: "leader", label: "主脑·任务推进" },
+const HFLOW: Array<{ role: string; label: string; audit?: boolean; reworkMid?: string }> = [
+  { role: "leader", label: "主线·任务推进" },
   { role: "write", label: "写代码" },
   { role: "audit", label: "审计 ①", audit: true, reworkMid: "write" },
   { role: "codeDig", label: "代码深挖" },
   { role: "optimize", label: "代码优化" },
   { role: "audit", label: "审计 ②", audit: true, reworkMid: "optimize" },
-  { role: "shotVerify", label: "截图验证" },
-  { role: "vmVerify", label: "虚拟机验证" },
-  { role: "humanVerify", label: "拟人验收" },
-  { role: "leader", label: "主脑签收", audit: true, reworkMid: "optimize" },
+  { role: "shotVerify", label: "截图认证" },
+  { role: "vmVerify", label: "虚拟机认证" },
+  { role: "humanVerify", label: "拟人认证" },
+  { role: "leader", label: "主线签收", audit: true, reworkMid: "optimize" },
+];
+const TAIL: Array<{ role: string; label: string }> = [
   { role: "push", label: "PR 推送(github/谷歌)" },
-  { role: "crisis", label: "危机处理签收" },
-  { role: "problem", label: "问题收集签收" },
-  { role: "memory", label: "记忆储存·清除签收" },
-  { role: "watchdog", label: "看门狗收口 ⏹" },
+  { role: "crisis", label: "危机签收" },
+  { role: "problem", label: "问题签收" },
+  { role: "memory", label: "记忆储存·清除" },
+  { role: "watchdog", label: "看门狗收口·停止 ⏹" },
 ];
 
 type WfDeps = {
@@ -336,7 +334,6 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
     const r = wfRoleOf(`${d.nameOf(m)} ${m.role ?? ""}`);
     if (r && !byRole[r]) byRole[r] = m;
   }
-  // 不是标准线小队(缺核心角色)就不用工作流布局
   if (!byRole.leader || !byRole.write || !byRole.audit) return null;
 
   const nodes: SquadFlowNode[] = [];
@@ -357,9 +354,21 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
       },
     } as SquadMemberNode);
   };
-  const flowEdge = (id: string, src: string, tgt: string, label?: string, bad?: boolean): void => {
+  const edge = (
+    id: string,
+    src: string,
+    tgt: string,
+    sh: string,
+    th: string,
+    label?: string,
+    bad?: boolean,
+  ): void => {
     edges.push({
-      id, source: src, target: tgt,
+      id,
+      source: src,
+      target: tgt,
+      sourceHandle: sh,
+      targetHandle: th,
       label,
       animated: false,
       style: { stroke: bad ? "#ef4444" : "#22c55e", strokeWidth: 1.5 },
@@ -368,19 +377,18 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
     } as Edge);
   };
 
-  // 只保留有对应成员的工序
-  const steps = LINE_FLOW.filter((st) => byRole[st.role]);
-  let y = 0;
-  steps.forEach((st, i) => {
-    const mainM = byRole[st.role];
-    if (!mainM) return;
-    const id = `wf-m-${i}`;
-    mkNode(id, mainM, st.label, WF_MAIN_X, y);
+  const mainSeq = HFLOW.filter((st) => byRole[st.role]);
+  let lastX = 0;
+  mainSeq.forEach((st, i) => {
+    const m = byRole[st.role];
+    if (!m) return;
+    const x = i * WF_HX;
+    lastX = x;
+    mkNode(`wf-m-${i}`, m, st.label, x, 0);
     if (i > 0) {
-      const prev = steps[i - 1];
-      flowEdge(`wf-e-${i}`, `wf-m-${i - 1}`, id, prev?.audit ? "✅合格" : undefined, false);
+      const prev = mainSeq[i - 1];
+      edge(`wf-e-${i}`, `wf-m-${i - 1}`, `wf-m-${i}`, "rs", "lt", prev?.audit ? "✅合格" : undefined, false);
     }
-    // 审计/签收 → 返工模块(右,不合格)
     const midRole = st.reworkMid ?? "write";
     const digM = byRole.reworkDig;
     const midM = byRole[midRole];
@@ -389,17 +397,28 @@ function buildLineWorkflow(d: WfDeps): { nodes: SquadFlowNode[]; edges: Edge[] }
       const digId = `wf-r-${i}-dig`;
       const midId = `wf-r-${i}-mid`;
       const audId = `wf-r-${i}-aud`;
-      mkNode(digId, digM, "返工深挖(BOM三视角·9层)", WF_REWORK_X, y);
-      mkNode(midId, midM, midRole === "write" ? "返工写代码" : "返工代码优化", WF_REWORK_X, y + WF_GAP_Y);
-      mkNode(audId, audM, "返工审计", WF_REWORK_X, y + WF_GAP_Y * 2);
-      flowEdge(`wf-re-${i}-1`, id, digId, "❌不合格", true);
-      flowEdge(`wf-re-${i}-2`, digId, midId);
-      flowEdge(`wf-re-${i}-3`, midId, audId);
-      flowEdge(`wf-re-${i}-back`, audId, digId, "❌不合格 ↺最高9次", true);
-      // 返工审计 合格 → 下一主工序
-      if (i + 1 < steps.length) flowEdge(`wf-re-${i}-ok`, audId, `wf-m-${i + 1}`, "✅合格", false);
+      mkNode(digId, digM, "返工深挖(BOM三视角·9层)", x, WF_ROW_Y);
+      mkNode(midId, midM, midRole === "write" ? "返工写代码" : "返工代码优化", x + WF_HX, WF_ROW_Y);
+      mkNode(audId, audM, "返工审计", x + WF_HX * 2, WF_ROW_Y);
+      edge(`wf-re-${i}-1`, `wf-m-${i}`, digId, "ts", "bt", "❌不合格", true);
+      edge(`wf-re-${i}-2`, digId, midId, "rs", "lt");
+      edge(`wf-re-${i}-3`, midId, audId, "rs", "lt");
+      edge(`wf-re-${i}-back`, audId, digId, "ts", "tt", "❌不合格·重走流程", true);
+      if (i + 1 < mainSeq.length) {
+        edge(`wf-re-${i}-ok`, audId, `wf-m-${i + 1}`, "bs", "tt", "✅合格", false);
+      }
     }
-    y += WF_GAP_Y;
+  });
+
+  const tailSeq = TAIL.filter((st) => byRole[st.role]);
+  let prevTail = `wf-m-${mainSeq.length - 1}`;
+  tailSeq.forEach((st, j) => {
+    const m = byRole[st.role];
+    if (!m) return;
+    const id = `wf-t-${j}`;
+    mkNode(id, m, st.label, lastX, (j + 1) * WF_VY);
+    edge(`wf-te-${j}`, prevTail, id, "bs", "tt", j === 0 ? "✅合格" : undefined, false);
+    prevTail = id;
   });
 
   return { nodes, edges };
