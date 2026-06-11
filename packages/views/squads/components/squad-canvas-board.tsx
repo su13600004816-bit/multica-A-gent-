@@ -300,6 +300,25 @@ const WF_HX = 250;
 const WF_VY = 120;
 const WF_ROW_Y = -150;
 
+// 成员名/角色 → 工作流角色键
+function wfRoleOf(s: string): string | null {
+  if (/返工.*深挖|返工深挖/.test(s)) return "reworkDig";
+  if (/代码深挖|深挖/.test(s)) return "codeDig";
+  if (/主线主脑|主线|负责人|Leader/.test(s)) return "leader";
+  if (/写码|写代码/.test(s)) return "write";
+  if (/审计/.test(s)) return "audit";
+  if (/代码优化|优化/.test(s)) return "optimize";
+  if (/截图验/.test(s)) return "shotVerify";
+  if (/虚机验|虚拟机/.test(s)) return "vmVerify";
+  if (/拟人验|拟人/.test(s)) return "humanVerify";
+  if (/PR推送|推送/.test(s)) return "push";
+  if (/危机/.test(s)) return "crisis";
+  if (/记忆/.test(s)) return "memory";
+  if (/问题/.test(s)) return "problem";
+  if (/看门狗/.test(s)) return "watchdog";
+  return null;
+}
+
 const HFLOW: Array<{ role: string; label: string; audit?: boolean; reworkMid?: string }> = [
   { role: "leader", label: "主线·任务推进" },
   { role: "write", label: "写代码" },
