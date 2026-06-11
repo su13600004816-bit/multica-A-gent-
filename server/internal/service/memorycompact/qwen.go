@@ -1,6 +1,7 @@
 package memorycompact
 
 import (
+	"regexp"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -129,7 +130,7 @@ func (q *QwenClient) Summarize(ctx context.Context, level Level, msgs []Message)
 	if !ok {
 		return "", fmt.Errorf("memorycompact: unknown level %q", level)
 	}
-	src := truncate(renderDigest(normalize(msgs), defaultT4Cap), 6000)
+	src := redactSecrets(truncate(renderDigest(normalize(msgs), defaultT4Cap), 6000))  // A: 外送第三方LLM前脱敏密钥/令牌
 	user := fmt.Sprintf(
 		"你是记忆总管。基于以下对话记录,只产出【%s】这一梯度的内容,不要别的梯度、不要解释。\n要求:%s\n\n对话记录:\n%s",
 		level, instr, src,
@@ -201,4 +202,22 @@ func DefaultCompactor() Compactor {
 		return ModelCompactor{Client: client}
 	}
 	return DeterministicCompactor{}
+}
+
+// A: 发给外部 LLM 前脱敏常见密钥/令牌/私钥,防数据出境泄露(总管 2026-06-12)。
+var secretPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)sk-[A-Za-z0-9_-]{16,}`),
+	regexp.MustCompile(`gh[pousr]_[A-Za-z0-9]{20,}`),
+	regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
+	regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._-]{20,}`),
+	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----`),
+	regexp.MustCompile(`(?i)(api[_-]?key|secret|token|password|passwd)\s*[:=]\s*\S{8,}`),
+	regexp.MustCompile(`eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}`),
+}
+
+func redactSecrets(s string) string {
+	for _, re := range secretPatterns {
+		s = re.ReplaceAllString(s, "[REDACTED]")
+	}
+	return s
 }

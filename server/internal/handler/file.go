@@ -1,7 +1,12 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"image"
+	"image/jpeg"
+	_ "image/gif"
+	_ "image/png"
 	"fmt"
 	"io"
 	"log/slog"
@@ -237,6 +242,14 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "failed to read file")
 		return
+	}
+
+	// B(总管 2026-06-12): 服务端兜底降采样 —— 覆盖 agent/CLI/API/移动端等不走客户端压缩的上传入口,
+	// 把超 1568px 长边的栅格图降到 ≤1568、重编 JPEG,省 Vision token/体积。失败/无收益一律回退原文件,绝不弄坏上传。
+	if nd, nct, next := maybeDownscaleImage(data, contentType); next != "" {
+		data = nd
+		contentType = nct
+		header.Filename = strings.TrimSuffix(header.Filename, path.Ext(header.Filename)) + next
 	}
 
 	// Generate a UUIDv7 to use as both the attachment ID and S3 key.
@@ -797,4 +810,53 @@ func (h *Handler) deleteS3Objects(ctx context.Context, urls []string) {
 		keys[i] = h.Storage.KeyFromURL(u)
 	}
 	h.Storage.DeleteKeys(ctx, keys)
+}
+
+// maybeDownscaleImage 服务端降采样兜底(纯 std,CGO0)。返回 (新数据,新ContentType,新扩展名);
+// 任何无法处理/无收益的情况都返回 next="" 表示"用原文件"。最近邻缩放,质量够用于省 token。
+func maybeDownscaleImage(data []byte, contentType string) ([]byte, string, string) {
+	const maxEdge = 1568
+	if !strings.HasPrefix(contentType, "image/") {
+		return nil, "", ""
+	}
+	if contentType == "image/svg+xml" || contentType == "image/webp" {
+		return nil, "", "" // 矢量不处理; webp 已小/客户端已处理
+	}
+	src, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", ""
+	}
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if w <= maxEdge && h <= maxEdge {
+		return nil, "", "" // 已够小
+	}
+	nw, nh := w, h
+	if w >= h {
+		nw, nh = maxEdge, h*maxEdge/w
+	} else {
+		nw, nh = w*maxEdge/h, maxEdge
+	}
+	if nw < 1 {
+		nw = 1
+	}
+	if nh < 1 {
+		nh = 1
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, nw, nh))
+	for y := 0; y < nh; y++ {
+		sy := b.Min.Y + y*h/nh
+		for x := 0; x < nw; x++ {
+			sx := b.Min.X + x*w/nw
+			dst.Set(x, y, src.At(sx, sy))
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 82}); err != nil {
+		return nil, "", ""
+	}
+	if buf.Len() >= len(data) {
+		return nil, "", "" // 没省到,用原文件
+	}
+	return buf.Bytes(), "image/jpeg", ".jpg"
 }
