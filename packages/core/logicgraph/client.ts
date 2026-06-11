@@ -45,12 +45,13 @@ export class LogicGraphClient {
       const d = (await r.json()) as RpcResult;
       if (!d.ok || !d.result) return null;
       const res = d.result;
+      type RawEdge = { from?: string; to?: string; type?: string; label?: string };
       return {
         nodes: (res.nodes ?? []) as LogicGraph["nodes"],
-        edges: ((res.edges ?? []) as Record<string, string>[]).map((e) => ({
-          from: e.from,
-          to: e.to,
-          type: e.type,
+        edges: ((res.edges ?? []) as RawEdge[]).map((e) => ({
+          from: e.from ?? "",
+          to: e.to ?? "",
+          type: e.type ?? "edge",
           label: e.label,
         })),
         groups: (res.groups ?? []) as LogicGraph["groups"],
