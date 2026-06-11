@@ -2078,17 +2078,28 @@ func (h *Handler) ReportTaskMessages(w http.ResponseWriter, r *http.Request) {
 
 		var inputJSON []byte
 		if msg.Input != nil {
-			inputJSON, _ = json.Marshal(msg.Input)
+			var marshalErr error
+			if inputJSON, marshalErr = json.Marshal(msg.Input); marshalErr != nil {
+				slog.Warn("marshal task message input failed", "task_id", taskID, "seq", msg.Seq, "error", marshalErr)
+			}
 		}
-		h.Queries.CreateTaskMessage(r.Context(), db.CreateTaskMessageParams{
-			TaskID:  parseUUID(taskID),
+		// Use the resolved task.ID rather than re-parsing the raw URL param
+		// (requireDaemonTaskAccess already validated and loaded it). The
+		// CreateTaskMessage error is surfaced via logging; the broadcast below
+		// is intentionally left unchanged to preserve the existing response
+		// contract — making delivery conditional on the insert is a behavior
+		// change outside this optimization pass.
+		if _, err := h.Queries.CreateTaskMessage(r.Context(), db.CreateTaskMessageParams{
+			TaskID:  task.ID,
 			Seq:     int32(msg.Seq),
 			Type:    msg.Type,
 			Tool:    pgtype.Text{String: msg.Tool, Valid: msg.Tool != ""},
 			Content: pgtype.Text{String: msg.Content, Valid: msg.Content != ""},
 			Input:   inputJSON,
 			Output:  pgtype.Text{String: msg.Output, Valid: msg.Output != ""},
-		})
+		}); err != nil {
+			slog.Warn("persist task message failed", "task_id", taskID, "seq", msg.Seq, "error", err)
+		}
 
 		if workspaceID != "" {
 			h.publishTask(protocol.EventTaskMessage, workspaceID, "system", "", taskID, protocol.TaskMessagePayload{
@@ -2128,11 +2139,11 @@ func (h *Handler) ListTaskMessages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		messages, err = h.Queries.ListTaskMessagesSince(r.Context(), db.ListTaskMessagesSinceParams{
-			TaskID: parseUUID(taskID),
+			TaskID: task.ID,
 			Seq:    int32(sinceSeq),
 		})
 	} else {
-		messages, err = h.Queries.ListTaskMessages(r.Context(), parseUUID(taskID))
+		messages, err = h.Queries.ListTaskMessages(r.Context(), task.ID)
 	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list task messages")
@@ -2145,7 +2156,9 @@ func (h *Handler) ListTaskMessages(w http.ResponseWriter, r *http.Request) {
 	for i, m := range messages {
 		var input map[string]any
 		if m.Input != nil {
-			json.Unmarshal(m.Input, &input)
+			if err := json.Unmarshal(m.Input, &input); err != nil {
+				slog.Warn("unmarshal stored task message input failed", "task_id", taskID, "seq", m.Seq, "error", err)
+			}
 		}
 		resp[i] = protocol.TaskMessagePayload{
 			TaskID:  taskID,
@@ -2288,7 +2301,9 @@ func (h *Handler) ListTaskMessagesByUser(w http.ResponseWriter, r *http.Request)
 	for i, m := range messages {
 		var input map[string]any
 		if m.Input != nil {
-			json.Unmarshal(m.Input, &input)
+			if err := json.Unmarshal(m.Input, &input); err != nil {
+				slog.Warn("unmarshal stored task message input failed", "task_id", taskID, "seq", m.Seq, "error", err)
+			}
 		}
 		resp[i] = protocol.TaskMessagePayload{
 			TaskID:  taskID,
