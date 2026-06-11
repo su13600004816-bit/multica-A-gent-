@@ -905,6 +905,28 @@ func (h *Handler) RecordSquadLeaderEvaluation(w http.ResponseWriter, r *http.Req
 
 // ── Squad Trigger Logic ─────────────────────────────────────────────────────
 
+// issueOwningSquadID returns the squad that OWNS the issue — its current squad
+// assignee — and true, or the zero UUID and false when the issue is not
+// squad-assigned.
+//
+// This is the single source of truth for watchdog re-routing ("回本队"). When a
+// stage-stall / anomaly watchdog re-routes an issue, the work is handed back to
+// the squad that already owns it, derived purely from the issue's own
+// assignee — NEVER re-targeted onto a different squad. A C-series (C01–C06)
+// issue therefore always routes back to that same C squad; there is
+// structurally no path for a C-series anomaly to land on a mechanism line
+// (T01/T02/T03), because the only squad ever consulted is the issue's own
+// assignee. A T-series squad receives a re-route only when it itself owns the
+// issue. Cross-team audit means a different ROLE inside the owning squad
+// reviews (producer ≠ reviewer, same squad) — it never means a different
+// squad, and this helper is what enforces that at the routing layer.
+func issueOwningSquadID(issue db.Issue) (pgtype.UUID, bool) {
+	if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+		return pgtype.UUID{}, false
+	}
+	return issue.AssigneeID, true
+}
+
 // shouldEnqueueSquadLeaderOnComment returns true if the issue is assigned to a
 // squad and the comment author is NOT a member of that squad (anti-loop).
 // commentContent is the new comment's markdown body; when a member explicitly
@@ -915,13 +937,16 @@ func (h *Handler) RecordSquadLeaderEvaluation(w http.ResponseWriter, r *http.Req
 // leader. Agent-authored comments always go through the leader (subject to
 // the leader self-trigger guard) so agent updates still drive coordination.
 func (h *Handler) shouldEnqueueSquadLeaderOnComment(ctx context.Context, issue db.Issue, commentContent, authorType, authorID string) bool {
-	if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+	// Route only to the squad that owns the issue (回本队); a non-squad assignee
+	// has no leader to wake.
+	squadID, ok := issueOwningSquadID(issue)
+	if !ok {
 		return false
 	}
 
 	// Load the squad.
 	squad, err := h.Queries.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
-		ID:          issue.AssigneeID,
+		ID:          squadID,
 		WorkspaceID: issue.WorkspaceID,
 	})
 	if err != nil {
@@ -1027,11 +1052,12 @@ func (h *Handler) actorIsSquadLeader(ctx context.Context, issue db.Issue, actorT
 	if actorType != "agent" {
 		return false
 	}
-	if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+	squadID, ok := issueOwningSquadID(issue)
+	if !ok {
 		return false
 	}
 	squad, err := h.Queries.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
-		ID:          issue.AssigneeID,
+		ID:          squadID,
 		WorkspaceID: issue.WorkspaceID,
 	})
 	if err != nil {
@@ -1046,11 +1072,12 @@ func (h *Handler) actorIsSquadLeader(ctx context.Context, issue db.Issue, actorT
 // gate via service.AgentReadiness — both paths must move together or one
 // will start enqueueing tasks the other refuses (MUL-2429 RFC §4.b B4).
 func (h *Handler) isSquadLeaderReady(ctx context.Context, issue db.Issue) bool {
-	if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+	squadID, ok := issueOwningSquadID(issue)
+	if !ok {
 		return false
 	}
 	squad, err := h.Queries.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
-		ID:          issue.AssigneeID,
+		ID:          squadID,
 		WorkspaceID: issue.WorkspaceID,
 	})
 	if err != nil {
@@ -1071,8 +1098,15 @@ func (h *Handler) isSquadLeaderReady(ctx context.Context, issue db.Issue) bool {
 
 // enqueueSquadLeaderTask triggers the squad leader agent for an issue assigned to a squad.
 func (h *Handler) enqueueSquadLeaderTask(ctx context.Context, issue db.Issue, triggerCommentID pgtype.UUID, authorType, authorID string) {
+	// The watchdog re-route target is always the issue's OWNING squad (回本队),
+	// never a foreign mechanism line (T01/T02/T03). issueOwningSquadID is the
+	// single source of truth for that invariant.
+	squadID, ok := issueOwningSquadID(issue)
+	if !ok {
+		return
+	}
 	squad, err := h.Queries.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
-		ID:          issue.AssigneeID,
+		ID:          squadID,
 		WorkspaceID: issue.WorkspaceID,
 	})
 	if err != nil {
