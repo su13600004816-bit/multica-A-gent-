@@ -249,6 +249,25 @@ func TestBuildPromptSquadLeaderNoActionForAgentTrigger(t *testing.T) {
 	}
 }
 
+func TestBuildPromptDocumentsNoTriggerComments(t *testing.T) {
+	task := Task{
+		IssueID:               "issue-123",
+		TriggerCommentID:      "comment-456",
+		TriggerCommentContent: "status?",
+		TriggerAuthorType:     "member",
+	}
+	out := BuildPrompt(task, "claude")
+	for _, want := range []string{
+		"`multica issue comment add <issue-id> --no-trigger`",
+		"`/note` is only a compatibility fallback",
+		"Do not use personal `mention://agent/...` links for internal squad routing",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("comment prompt missing no-trigger guidance %q\n---\n%s", want, out)
+		}
+	}
+}
+
 func TestBuildChatPromptSlashSkills(t *testing.T) {
 	t.Run("injects selected skills block", func(t *testing.T) {
 		task := Task{
