@@ -11,6 +11,15 @@ export type LogicGraphClientOptions = {
 
 type RpcResult = { ok?: boolean; result?: { nodes?: unknown[]; edges?: unknown[]; groups?: unknown[] } };
 
+// Stored graph names are file-backed on the service (`<name>.json`). Restrict
+// them to a flat slug so a name from the (semi-trusted) list/dropdown can't
+// smuggle path separators or `..` into the RPC `file` field. Also rejects the
+// empty name, which would otherwise poll `.json` forever (see waitForGraph).
+const SAFE_GRAPH_NAME = /^[A-Za-z0-9._-]+$/;
+function isSafeGraphName(name: string): boolean {
+  return SAFE_GRAPH_NAME.test(name) && !name.includes("..");
+}
+
 export class LogicGraphClient {
   private base: string;
   private f: typeof fetch;
@@ -34,6 +43,7 @@ export class LogicGraphClient {
 
   /** Load one graph's nodes/edges/groups. */
   async getGraph(name: string): Promise<LogicGraph | null> {
+    if (!isSafeGraphName(name)) return null;
     try {
       const r = await this.f(`${this.base}/rpc`, {
         method: "POST",
@@ -78,11 +88,12 @@ export class LogicGraphClient {
       });
       if (!r.ok) return null;
       const ct = r.headers.get("content-type") ?? "";
-      if (ct.includes("application/json")) {
-        const d = (await r.json()) as { name?: string };
-        return { name: d.name ?? name ?? "" };
-      }
-      return { name: name ?? "" };
+      const resolved = ct.includes("application/json")
+        ? ((await r.json()) as { name?: string }).name ?? name
+        : name;
+      // No name to poll on means waitForGraph would spin `.json` for the full
+      // timeout against nothing — fail fast instead.
+      return resolved ? { name: resolved } : null;
     } catch {
       return null;
     }

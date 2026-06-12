@@ -5,6 +5,8 @@
 // hard-coded here.
 import type { LogicGraph } from "./graph";
 import { layeredLayout } from "./layout";
+// NOTE: edge dashing lives in the renderer (logic-graph-canvas.tsx owns the
+// DASHED set), since dashing is a visual concern. This module stays headless.
 
 export type FlowNode = {
   id: string;
@@ -21,10 +23,6 @@ export type FlowEdge = {
   data: { kind: string };
   animated?: boolean;
 };
-
-// Edge kinds that read better as dashed/secondary lines (monitoring, blocking,
-// interconnection) vs solid primary flow.
-const DASHED = new Set(["monitors", "blocks", "interconnects"]);
 
 export function graphToFlow(graph: LogicGraph): { nodes: FlowNode[]; edges: FlowEdge[] } {
   const pos = layeredLayout(graph);

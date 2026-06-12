@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -66,6 +66,17 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [desc, setDesc] = useState("");
   const [busy, setBusy] = useState<string | null>(null); // status text while generating
+  const [error, setError] = useState<string | null>(null); // one-shot failure notice (separate from busy)
+
+  // Guard async setState after unmount: loadGraph/generate await network calls
+  // (generate can poll up to ~120s) and must not touch state once gone.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const applyGraph = useCallback(
     (graph: LogicGraph) => {
@@ -81,6 +92,7 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
     async (name: string) => {
       setBusy("加载中…");
       const g = await client.getGraph(name);
+      if (!mountedRef.current) return;
       setBusy(null);
       if (g) {
         setActiveName(name);
@@ -112,22 +124,29 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
   const generate = useCallback(async () => {
     const text = desc.trim();
     if (!text) return;
+    setError(null);
     setBusy("模型生成中…(约 30–60 秒)");
     const queued = await client.buildFromText(text);
+    if (!mountedRef.current) return;
     if (!queued) {
-      setBusy("生成失败,请重试");
+      // Clear busy (not leave it set) so the buttons re-enable and the user can retry.
+      setBusy(null);
+      setError("生成失败,请重试");
       return;
     }
     const g = await client.waitForGraph(queued.name);
+    if (!mountedRef.current) return;
     setBusy(null);
     if (g && g.nodes.length > 0) {
       setDialogOpen(false);
       setDesc("");
       setActiveName(queued.name);
       applyGraph(g);
-      void client.listGraphs().then(setGraphs);
+      void client.listGraphs().then((names) => {
+        if (mountedRef.current) setGraphs(names);
+      });
     } else {
-      setBusy("生成超时,稍后在列表里查看");
+      setError("生成超时,稍后在列表里查看");
     }
   }, [desc, client, applyGraph]);
 
@@ -165,7 +184,8 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
           </div>
         </Panel>
 
-        {/* 逻辑图工具栏 — 与画布编排工具栏同款 chrome,Multica Button token,不另设皮肤 */}
+        {/* Logic-graph toolbar — same chrome as the canvas-orchestration toolbar, using
+            Multica Button tokens; no separate skin. */}
         <Panel position="bottom-center">
           <div className="flex items-center gap-1 rounded-lg border bg-background px-1.5 py-1 shadow-sm">
             <Button size="xs" variant="ghost" onClick={() => setDialogOpen(true)}>
@@ -198,7 +218,13 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
         </Panel>
       </ReactFlow>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (open) setError(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-1.5">
@@ -215,6 +241,7 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
             placeholder="例:有个总指挥派活到三条线,每条线有写码员和审计员,审计不过退回返工;看门狗只盯不派活,卡住升级给总指挥。"
             className="min-h-[120px]"
           />
+          {error && <p className="text-[11px] text-destructive">{error}</p>}
           <DialogFooterRow>
             <Button variant="ghost" size="sm" onClick={() => setDialogOpen(false)} disabled={!!busy}>
               取消

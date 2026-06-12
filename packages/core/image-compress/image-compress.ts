@@ -1,11 +1,11 @@
 /**
- * 图片压缩工具
- * 优化图片到 Anthropic Vision 最优尺寸，降低发给主脑的 token
+ * Image compression utility.
+ * Shrinks images to Anthropic Vision's optimal size to cut the tokens sent to the model.
  *
- * 压缩参数:
- * - 长边 ≤1568px (Anthropic vision 最优尺寸)
- * - 输出 WebP，质量 ~0.8
- * - 压缩失败、非 WebP、超 2MB 或长边超限时阻止图片上传
+ * Parameters:
+ * - long edge <= 1568px (Anthropic Vision optimal size)
+ * - output WebP, quality ~0.8
+ * - block upload when compression fails, output is not WebP, exceeds 2MB, or the long edge is too large
  */
 
 import { IMAGE_COMPRESSION_QUALITY, MAX_IMAGE_LONG_EDGE, MAX_UPLOAD_IMAGE_BYTES } from "./config";
@@ -115,12 +115,12 @@ function isHeicLikeFile(file: File): boolean {
 }
 
 /**
- * 压缩图片文件
- * @param file 原始文件
- * @returns Promise<CompressionResult> 压缩结果
+ * Compress an image file.
+ * @param file the original file
+ * @returns Promise<CompressionResult> the compression result
  */
 export async function compressImage(file: File): Promise<CompressionResult> {
-  // 非图片文件直接返回
+  // Non-image files are returned untouched.
   if (!file.type.startsWith('image/')) {
     return {
       file,
@@ -147,13 +147,13 @@ export async function compressImage(file: File): Promise<CompressionResult> {
     const ctx = canvas.getContext('2d');
 
     if (!ctx) {
-      throw new Error('无法获取canvas上下文');
+      throw new Error('Failed to get canvas 2d context');
     }
 
-    // 使用 createImageBitmap 加载图片（按审计要求）
+    // Load the image via createImageBitmap (per the audit requirement).
     imageBitmap = await createImageBitmap(file);
 
-    // 计算压缩后的尺寸，长边不超过 1568px (Anthropic Vision 最优)
+    // Compute the target size; keep the long edge within 1568px (Anthropic Vision optimal).
     const sourceWidth = imageBitmap.width;
     const sourceHeight = imageBitmap.height;
     let width = sourceWidth;
@@ -174,7 +174,7 @@ export async function compressImage(file: File): Promise<CompressionResult> {
     canvas.width = width;
     canvas.height = height;
 
-    // 绘制压缩后的图片
+    // Draw the resized image.
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(imageBitmap, 0, 0, width, height);
@@ -223,7 +223,7 @@ export async function compressImage(file: File): Promise<CompressionResult> {
         );
       }
 
-      // 只有原图已经是 WebP、未缩放且重压不省体积时，才允许继续使用原图。
+      // Only keep the original when it is already WebP, was not resized, and re-encoding saves no bytes.
       if (!resized && file.type === 'image/webp' && compressedSize >= originalSize) {
         const originalValidation = await validateCompressedImage(file);
         if (!originalValidation.ok) {
@@ -257,7 +257,7 @@ export async function compressImage(file: File): Promise<CompressionResult> {
         };
       }
 
-      // 生成压缩信息
+      // Build the compression notice.
       const originalMB = (originalSize / (1024 * 1024)).toFixed(1);
       const compressedKB = (compressedSize / 1024).toFixed(0);
       const savedPercent = Math.round((1 - compressionRatio) * 100);
@@ -314,7 +314,7 @@ export async function compressImage(file: File): Promise<CompressionResult> {
       'webp_unsupported'
     );
   } catch (error) {
-    console.error('图片压缩过程出错:', error);
+    console.error('Image compression failed:', error);
     const notice = isHeicLikeFile(file)
       ? '当前浏览器不能解码 HEIC，请在相册中选择兼容格式或先转 JPEG/WebP'
       : '压缩失败，已阻止图片上传';
@@ -339,9 +339,9 @@ export async function compressImage(file: File): Promise<CompressionResult> {
 }
 
 /**
- * 批量压缩图片文件
- * @param files 文件列表
- * @returns Promise<CompressionResult[]> 批量压缩结果
+ * Compress a batch of image files.
+ * @param files the file list
+ * @returns Promise<CompressionResult[]> the per-file compression results
  */
 export async function compressImages(files: FileList | File[]): Promise<CompressionResult[]> {
   const fileArray = Array.from(files);
@@ -350,18 +350,18 @@ export async function compressImages(files: FileList | File[]): Promise<Compress
 }
 
 /**
- * 检查文件是否为图片
- * @param file 文件
- * @returns boolean 是否为图片
+ * Check whether a file is an image.
+ * @param file the file
+ * @returns boolean whether it is an image
  */
 export function isImageFile(file: File): boolean {
   return file.type.startsWith('image/');
 }
 
 /**
- * 格式化文件大小显示
- * @param bytes 字节数
- * @returns string 格式化后的大小字符串
+ * Format a byte count as a human-readable size string.
+ * @param bytes the number of bytes
+ * @returns string the formatted size string
  */
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';

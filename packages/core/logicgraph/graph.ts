@@ -1,6 +1,6 @@
 // Self-contained logic-graph model (portable; mirrors the standalone logicgraph
 // service's JSON shape). Pure TS — no react, no @xyflow, no DOM. The headless
-// heart of the 逻辑图 feature: it lives on main as an independent package so the
+// heart of the logic-graph feature: it lives on main as an independent package so the
 // canvas (and any other surface) INHERITS it via merge, instead of the feature
 // being grafted onto a canvas branch.
 
