@@ -451,7 +451,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 
 	// Local file serving (when using local storage)
 	if local, ok := store.(*storage.LocalStorage); ok {
-		r.Get("/uploads/*", func(w http.ResponseWriter, r *http.Request) {
+		r.With(middleware.Auth(queries, patCache, cloudPATVerifier)).Get("/uploads/*", func(w http.ResponseWriter, r *http.Request) {
 			file := strings.TrimPrefix(r.URL.Path, "/uploads/")
 			local.ServeFile(w, r, file)
 		})
