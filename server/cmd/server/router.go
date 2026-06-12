@@ -795,6 +795,18 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				})
 			})
 
+			// Lines (deterministic pipeline runner)
+			r.Route("/api/lines", func(r chi.Router) {
+				r.Get("/", h.ListLines)
+				r.Post("/", h.CreateLine)
+				r.Route("/{lineId}", func(r chi.Router) {
+					r.Get("/", h.GetLine)
+					r.Post("/run", h.StartLineRun)
+					r.Get("/runs", h.ListLineRuns)
+				})
+			})
+			r.Get("/api/line-runs/{runId}", h.GetLineRun)
+
 			// Pins
 			r.Route("/api/pins", func(r chi.Router) {
 				r.Get("/", h.ListPins)

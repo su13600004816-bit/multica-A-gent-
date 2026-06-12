@@ -489,6 +489,32 @@ type LarkUserBinding struct {
 	BoundAt        pgtype.Timestamptz `json:"bound_at"`
 }
 
+type Line struct {
+	ID            pgtype.UUID        `json:"id"`
+	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
+	ProjectID     pgtype.UUID        `json:"project_id"`
+	Title         string             `json:"title"`
+	Graph         []byte             `json:"graph"`
+	Status        string             `json:"status"`
+	CreatedByType string             `json:"created_by_type"`
+	CreatedByID   pgtype.UUID        `json:"created_by_id"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type LineRun struct {
+	ID          pgtype.UUID        `json:"id"`
+	LineID      pgtype.UUID        `json:"line_id"`
+	WorkspaceID pgtype.UUID        `json:"workspace_id"`
+	Status      string             `json:"status"`
+	Graph       []byte             `json:"graph"`
+	NodeState   []byte             `json:"node_state"`
+	Error       pgtype.Text        `json:"error"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	FinishedAt  pgtype.Timestamptz `json:"finished_at"`
+}
+
 type Member struct {
 	ID          pgtype.UUID        `json:"id"`
 	WorkspaceID pgtype.UUID        `json:"workspace_id"`
@@ -518,6 +544,31 @@ type NotificationPreference struct {
 	UserID      pgtype.UUID        `json:"user_id"`
 	Preferences []byte             `json:"preferences"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type P0Notification struct {
+	ID            pgtype.UUID        `json:"id"`
+	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
+	Body          string             `json:"body"`
+	Source        string             `json:"source"`
+	CreatedByType string             `json:"created_by_type"`
+	CreatedByID   pgtype.UUID        `json:"created_by_id"`
+	AckedByType   pgtype.Text        `json:"acked_by_type"`
+	AckedByID     pgtype.UUID        `json:"acked_by_id"`
+	AckNote       pgtype.Text        `json:"ack_note"`
+	AckedAt       pgtype.Timestamptz `json:"acked_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type PendingP0Ack struct {
+	ID            pgtype.UUID        `json:"id"`
+	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
+	Body          string             `json:"body"`
+	Source        string             `json:"source"`
+	CreatedByType string             `json:"created_by_type"`
+	CreatedByID   pgtype.UUID        `json:"created_by_id"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
 type PersonalAccessToken struct {
@@ -602,6 +653,12 @@ type Squad struct {
 	ArchivedBy   pgtype.UUID        `json:"archived_by"`
 	AvatarUrl    pgtype.Text        `json:"avatar_url"`
 	Instructions string             `json:"instructions"`
+}
+
+type SquadCanvasLayout struct {
+	SquadID   pgtype.UUID        `json:"squad_id"`
+	Layout    []byte             `json:"layout"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type SquadMember struct {
