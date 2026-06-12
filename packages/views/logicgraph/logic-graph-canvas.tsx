@@ -165,7 +165,7 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
           </div>
         </Panel>
 
-        {/* 逻辑图工具栏 — 与画布编排工具栏同款 chrome,Multica Button token,不另设皮肤 */}
+        {/* Logic-graph toolbar — same chrome as the canvas-orchestration toolbar, using Multica Button tokens (no separate skin). */}
         <Panel position="bottom-center">
           <div className="flex items-center gap-1 rounded-lg border bg-background px-1.5 py-1 shadow-sm">
             <Button size="xs" variant="ghost" onClick={() => setDialogOpen(true)}>

@@ -22,10 +22,6 @@ export type FlowEdge = {
   animated?: boolean;
 };
 
-// Edge kinds that read better as dashed/secondary lines (monitoring, blocking,
-// interconnection) vs solid primary flow.
-const DASHED = new Set(["monitors", "blocks", "interconnects"]);
-
 export function graphToFlow(graph: LogicGraph): { nodes: FlowNode[]; edges: FlowEdge[] } {
   const pos = layeredLayout(graph);
   const nodes: FlowNode[] = (graph.nodes ?? []).map((n) => ({

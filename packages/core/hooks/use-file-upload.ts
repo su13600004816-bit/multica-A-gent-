@@ -33,10 +33,15 @@ export function useFileUpload(
       setUploading(true);
       try {
         let toUpload = file;
-      if (file.type.startsWith("image/")) {
-        try { const result = await compressImage(file); toUpload = result.file; } catch { toUpload = file; }
-      }
-      const att: Attachment = await api.uploadFile(toUpload, {
+        if (file.type.startsWith("image/")) {
+          try {
+            const result = await compressImage(file);
+            toUpload = result.file;
+          } catch {
+            toUpload = file;
+          }
+        }
+        const att: Attachment = await api.uploadFile(toUpload, {
           issueId: ctx?.issueId,
           commentId: ctx?.commentId,
           chatSessionId: ctx?.chatSessionId,
