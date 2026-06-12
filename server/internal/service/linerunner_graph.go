@@ -68,8 +68,8 @@ func ValidateLineGraph(g LineGraph) error {
 			return fmt.Errorf("duplicate node id %q", n.ID)
 		}
 		ids[n.ID] = true
-		if n.AssigneeType != "" && n.AssigneeType != "agent" {
-			return fmt.Errorf("node %q: only assignee_type=agent is supported", n.ID)
+		if n.AssigneeType != "" && n.AssigneeType != "agent" && n.AssigneeType != "squad" {
+			return fmt.Errorf("node %q: assignee_type must be agent or squad", n.ID)
 		}
 		if n.AssigneeID == "" {
 			return fmt.Errorf("node %q: missing assignee_id", n.ID)

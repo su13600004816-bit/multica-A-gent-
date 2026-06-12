@@ -198,12 +198,33 @@ func (s *LineRunnerService) advanceRun(ctx context.Context, run db.LineRun) erro
 }
 
 // dispatchNode creates an issue for the node and enqueues an agent task, the
-// same path autopilot uses. The issue's origin is the line so created work is
+// same path autopilot uses. Supports both bare-agent and squad assignees (the
+// squad leader executes). The issue's origin is the line so created work is
 // traceable back to the pipeline.
 func (s *LineRunnerService) dispatchNode(ctx context.Context, run db.LineRun, node LineNode, round int) (db.Issue, error) {
-	agentID, perr := util.ParseUUID(node.AssigneeID)
+	assigneeType := node.AssigneeType
+	if assigneeType == "" {
+		assigneeType = "agent"
+	}
+	assigneeID, perr := util.ParseUUID(node.AssigneeID)
 	if perr != nil {
 		return db.Issue{}, fmt.Errorf("node %q: invalid assignee_id: %w", node.ID, perr)
+	}
+
+	// Resolve the executing agent (creator). For a squad, that is the leader,
+	// who is also the agent the squad-leader enqueue routes to.
+	creatorID := assigneeID
+	var leaderID pgtype.UUID
+	if assigneeType == "squad" {
+		squad, err := s.Queries.GetSquad(ctx, assigneeID)
+		if err != nil {
+			return db.Issue{}, fmt.Errorf("node %q: load squad: %w", node.ID, err)
+		}
+		if squad.ArchivedAt.Valid {
+			return db.Issue{}, fmt.Errorf("node %q: squad is archived", node.ID)
+		}
+		leaderID = squad.LeaderID
+		creatorID = squad.LeaderID
 	}
 
 	tx, err := s.TxStarter.Begin(ctx)
@@ -235,10 +256,10 @@ func (s *LineRunnerService) dispatchNode(ctx context.Context, run db.LineRun, no
 		Description:   pgtype.Text{String: buildLineNodeDescription(node), Valid: true},
 		Status:        "todo",
 		Priority:      "none",
-		AssigneeType:  pgtype.Text{String: "agent", Valid: true},
-		AssigneeID:    agentID,
+		AssigneeType:  pgtype.Text{String: assigneeType, Valid: true},
+		AssigneeID:    assigneeID,
 		CreatorType:   "agent",
-		CreatorID:     agentID,
+		CreatorID:     creatorID,
 		ParentIssueID: pgtype.UUID{},
 		Position:      pos,
 		StartDate:     pgtype.Date{},
@@ -260,18 +281,25 @@ func (s *LineRunnerService) dispatchNode(ctx context.Context, run db.LineRun, no
 		Type:        protocol.EventIssueCreated,
 		WorkspaceID: util.UUIDToString(run.WorkspaceID),
 		ActorType:   "agent",
-		ActorID:     util.UUIDToString(agentID),
+		ActorID:     util.UUIDToString(creatorID),
 		Payload:     map[string]any{"issue": issueToMap(issue, prefix)},
 	})
 
-	if _, err := s.TaskSvc.EnqueueTaskForIssue(ctx, issue); err != nil {
-		return db.Issue{}, fmt.Errorf("enqueue task: %w", err)
+	if assigneeType == "squad" {
+		if _, err := s.TaskSvc.EnqueueTaskForSquadLeader(ctx, issue, leaderID, pgtype.UUID{}); err != nil {
+			return db.Issue{}, fmt.Errorf("enqueue squad leader task: %w", err)
+		}
+	} else {
+		if _, err := s.TaskSvc.EnqueueTaskForIssue(ctx, issue); err != nil {
+			return db.Issue{}, fmt.Errorf("enqueue task: %w", err)
+		}
 	}
 
 	slog.Info("line runner: dispatched node",
 		"run_id", util.UUIDToString(run.ID),
 		"line_id", util.UUIDToString(run.LineID),
 		"node", node.ID,
+		"assignee_type", assigneeType,
 		"issue_number", issue.Number,
 		"round", round,
 	)

@@ -18,6 +18,14 @@ type CreateLineRequest struct {
 	ProjectID *string           `json:"project_id,omitempty"`
 }
 
+// StartLineRunRequest is the optional payload for POST /api/lines/{id}/run.
+// seed maps node ids to existing issue ids so a run can ADOPT issues that are
+// already in flight (e.g. legacy stage issues stuck mid-pipeline) instead of
+// creating fresh ones — the runner then drives them to completion.
+type StartLineRunRequest struct {
+	Seed map[string]string `json:"seed,omitempty"`
+}
+
 // CreateLine validates a pipeline graph and stores it as a reusable line.
 func (h *Handler) CreateLine(w http.ResponseWriter, r *http.Request) {
 	var req CreateLineRequest
@@ -114,7 +122,8 @@ func (h *Handler) GetLine(w http.ResponseWriter, r *http.Request) {
 }
 
 // StartLineRun snapshots the line graph and creates a running line_run. The
-// backend line runner goroutine picks it up and drives it to completion.
+// backend line runner goroutine picks it up and drives it to completion. An
+// optional seed map adopts existing in-flight issues for specific nodes.
 func (h *Handler) StartLineRun(w http.ResponseWriter, r *http.Request) {
 	wsUUID, ok := parseUUIDOrBadRequest(w, h.resolveWorkspaceID(r), "workspace id")
 	if !ok {
@@ -124,6 +133,13 @@ func (h *Handler) StartLineRun(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+
+	// Body is optional; tolerate an empty one.
+	var req StartLineRunRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
 	line, err := h.Queries.GetLineInWorkspace(r.Context(), db.GetLineInWorkspaceParams{
 		ID:          id,
 		WorkspaceID: wsUUID,
@@ -144,11 +160,17 @@ func (h *Handler) StartLineRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	nodeState, err := h.buildSeedState(r, wsUUID, graph, req.Seed)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	run, err := h.Queries.CreateLineRun(r.Context(), db.CreateLineRunParams{
 		LineID:      line.ID,
 		WorkspaceID: wsUUID,
 		Graph:       line.Graph,
-		NodeState:   []byte("{}"),
+		NodeState:   nodeState,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to start line run")
@@ -156,6 +178,49 @@ func (h *Handler) StartLineRun(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"run": run})
 }
+
+// buildSeedState turns an optional node→issue seed map into an initial
+// node_state JSON. Seeded nodes adopt the existing issue (done issues are
+// marked done so the runner advances downstream; others are marked dispatched
+// so the runner polls them). Unseeded nodes are left for the runner to init.
+func (h *Handler) buildSeedState(r *http.Request, wsUUID pgtype.UUID, graph service.LineGraph, seed map[string]string) ([]byte, error) {
+	if len(seed) == 0 {
+		return []byte("{}"), nil
+	}
+	nodeIDs := make(map[string]bool, len(graph.Nodes))
+	for _, n := range graph.Nodes {
+		nodeIDs[n.ID] = true
+	}
+	state := map[string]service.LineNodeState{}
+	for nodeID, issueIDStr := range seed {
+		if !nodeIDs[nodeID] {
+			return nil, errBadSeed("seed references unknown node " + nodeID)
+		}
+		issueID, perr := util.ParseUUID(issueIDStr)
+		if perr != nil {
+			return nil, errBadSeed("seed has invalid issue id for node " + nodeID)
+		}
+		issue, gerr := h.Queries.GetIssue(r.Context(), issueID)
+		if gerr != nil || util.UUIDToString(issue.WorkspaceID) != util.UUIDToString(wsUUID) {
+			return nil, errBadSeed("seed issue not found for node " + nodeID)
+		}
+		status := "dispatched"
+		if issue.Status == "done" {
+			status = "done"
+		}
+		state[nodeID] = service.LineNodeState{
+			IssueID:     util.UUIDToString(issue.ID),
+			IssueNumber: issue.Number,
+			Status:      status,
+		}
+	}
+	return json.Marshal(state)
+}
+
+type seedError struct{ msg string }
+
+func (e seedError) Error() string { return e.msg }
+func errBadSeed(msg string) error { return seedError{msg} }
 
 // GetLineRun returns a run's live status (node_state shows per-stage progress).
 func (h *Handler) GetLineRun(w http.ResponseWriter, r *http.Request) {
