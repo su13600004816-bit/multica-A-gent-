@@ -85,7 +85,6 @@
     "@tiptap/react": "^3.22.1",
     "@tiptap/starter-kit": "^3.22.1",
     "@tiptap/suggestion": "^3.22.1",
-    "@xyflow/react": "^12.11.0",
     "cmdk": "^1.1.1",
     "hast-util-to-html": "^9.0.5",
     "katex": "catalog:",
