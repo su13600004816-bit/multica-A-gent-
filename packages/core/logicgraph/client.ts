@@ -65,11 +65,19 @@ export class LogicGraphClient {
    * Ask the service (LLM-backed) to build a graph from a prose description.
    * Returns the graph name to poll with getGraph(); resolves once queued.
    */
-  async buildFromText(text: string, name?: string): Promise<{ name: string } | null> {
+  async buildFromText(
+    text: string,
+    name?: string,
+    file?: { b64: string; name: string },
+  ): Promise<{ name: string } | null> {
     try {
       const body = new URLSearchParams();
       body.set("text", text);
       if (name) body.set("name", name);
+      if (file) {
+        body.set("file_b64", file.b64);
+        body.set("file_name", file.name);
+      }
       const r = await this.f(`${this.base}/design`, {
         method: "POST",
         credentials: "include",

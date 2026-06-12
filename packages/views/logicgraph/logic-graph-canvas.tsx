@@ -26,7 +26,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@multica/ui/components/ui/dialog";
-import { Sparkles, Maximize2, FolderOpen, Loader2 } from "lucide-react";
+import { Sparkles, Maximize2, FolderOpen, Loader2, Paperclip } from "lucide-react";
 import { LogicGraphClient, graphToFlow, type FlowEdge, type LogicGraph } from "@multica/core/logicgraph";
 import { LogicNode, type LogicFlowNode } from "./logic-node";
 
@@ -65,6 +65,7 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
   const [activeName, setActiveName] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [desc, setDesc] = useState("");
+  const [file, setFile] = useState<{ b64: string; name: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // status text while generating
 
   const applyGraph = useCallback(
@@ -109,11 +110,21 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
     [setEdges],
   );
 
+  const onPickFile = useCallback((f: File | undefined) => {
+    if (!f) {
+      setFile(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setFile({ b64: String(reader.result || ""), name: f.name });
+    reader.readAsDataURL(f); // data URL; server strips the prefix
+  }, []);
+
   const generate = useCallback(async () => {
     const text = desc.trim();
-    if (!text) return;
-    setBusy("模型生成中…(约 30–60 秒)");
-    const queued = await client.buildFromText(text);
+    if (!text && !file) return;
+    setBusy(file ? "读图/读文档并生成中…(约 30–90 秒)" : "模型生成中…(约 30–60 秒)");
+    const queued = await client.buildFromText(text, undefined, file ?? undefined);
     if (!queued) {
       setBusy("生成失败,请重试");
       return;
@@ -123,13 +134,14 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
     if (g && g.nodes.length > 0) {
       setDialogOpen(false);
       setDesc("");
+      setFile(null);
       setActiveName(queued.name);
       applyGraph(g);
       void client.listGraphs().then(setGraphs);
     } else {
       setBusy("生成超时,稍后在列表里查看");
     }
-  }, [desc, client, applyGraph]);
+  }, [desc, file, client, applyGraph]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-lg border bg-background">
@@ -203,23 +215,36 @@ function LogicGraphFlow({ baseUrl }: { baseUrl?: string }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-1.5">
               <Sparkles className="size-4" />
-              用一段话生成逻辑图
+              生成逻辑图(文字 / 照片 / 文档)
             </DialogTitle>
             <DialogDescription>
-              描述你的架构/逻辑关系,模型会建成一张图、自查漏,画进画布。
+              写一段描述,或上传一张架构照片/截图/PDF/文档——模型读懂后建成一张图、自查漏,画进画布。
             </DialogDescription>
           </DialogHeader>
           <Textarea
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
-            placeholder="例:有个总指挥派活到三条线,每条线有写码员和审计员,审计不过退回返工;看门狗只盯不派活,卡住升级给总指挥。"
-            className="min-h-[120px]"
+            placeholder="例:有个总指挥派活到三条线,每条线有写码员和审计员,审计不过退回返工;看门狗只盯不派活,卡住升级给总指挥。(也可只上传照片/文档,不填这里)"
+            className="min-h-[110px]"
           />
+          <label className="mt-2 flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-input px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40">
+            <Paperclip className="size-3.5 shrink-0" />
+            <span className="truncate">
+              {file ? `已选:${file.name}` : "上传照片 / 截图 / PDF / 文档(模型读图/读文档建图)"}
+            </span>
+            <input
+              type="file"
+              accept="image/*,.pdf,.txt,.md,.doc,.docx"
+              className="hidden"
+              onChange={(e) => onPickFile(e.target.files?.[0])}
+              disabled={!!busy}
+            />
+          </label>
           <DialogFooterRow>
             <Button variant="ghost" size="sm" onClick={() => setDialogOpen(false)} disabled={!!busy}>
               取消
             </Button>
-            <Button size="sm" onClick={() => void generate()} disabled={!desc.trim() || !!busy}>
+            <Button size="sm" onClick={() => void generate()} disabled={(!desc.trim() && !file) || !!busy}>
               {busy ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <FolderOpen className="size-3.5 mr-1" />}
               {busy ?? "生成"}
             </Button>
