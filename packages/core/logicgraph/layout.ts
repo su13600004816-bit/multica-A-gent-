@@ -59,7 +59,9 @@ export function layeredLayout(graph: LogicGraph): Record<string, XY> {
     (byLayer.get(l) ?? byLayer.set(l, []).get(l)!).push(id);
   }
 
-  const maxCount = Math.max(...[...byLayer.values()].map((a) => a.length), 1);
+  // reduce (not Math.max(...spread)) so a graph with very many layers can't blow
+  // the call stack via argument spreading.
+  const maxCount = [...byLayer.values()].reduce((m, a) => Math.max(m, a.length), 1);
   const pos: Record<string, XY> = {};
   for (const [l, members] of [...byLayer.entries()].sort((a, b) => a[0] - b[0])) {
     const colHeight = (members.length - 1) * GAP_Y;
