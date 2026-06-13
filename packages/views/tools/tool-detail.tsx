@@ -15,7 +15,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@multica/ui/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@multica/ui/components/ui/tooltip";
 import { findTool } from "./data";
-import { useToolTelemetry, timeAgo, isFailed, type ToolCall, type ToolProblem } from "./telemetry";
+import {
+  useToolTelemetry,
+  useToolSpec,
+  timeAgo,
+  isFailed,
+  type ToolCall,
+  type ToolProblem,
+  type JsonSchema,
+  type JsonSchemaProp,
+} from "./telemetry";
 import type { Tool } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -131,15 +140,19 @@ function ToolDetailBody({ tool }: { tool: Tool }) {
 
       {/* Level-3 tabs: 概览 / 调用记录 / 配置 / 日志 */}
       <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
-        <TabsList className="mx-5 mt-3 w-fit">
+        <TabsList className="mx-5 mt-3 flex w-auto flex-wrap">
           <TabsTrigger value="overview">概览</TabsTrigger>
-          <TabsTrigger value="calls">调用记录</TabsTrigger>
+          <TabsTrigger value="params">参数</TabsTrigger>
+          <TabsTrigger value="calls">调用</TabsTrigger>
           <TabsTrigger value="config">配置</TabsTrigger>
           <TabsTrigger value="logs">日志</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-0 min-h-0 flex-1">
           <OverviewTab tool={tool} />
+        </TabsContent>
+        <TabsContent value="params" className="mt-0 min-h-0 flex-1">
+          <ParamsTab tool={tool} />
         </TabsContent>
         <TabsContent value="calls" className="mt-0 min-h-0 flex-1">
           <CallsTab tool={tool} />
@@ -202,6 +215,116 @@ function EmptyHint({ children }: { children: ReactNode }) {
   return <p className="px-5 py-8 text-center text-xs text-muted-foreground">{children}</p>;
 }
 
+/** Copyable JSON code block (examples). */
+function JsonBlock({ label, value }: { label: string; value: unknown }) {
+  const text = JSON.stringify(value, null, 2);
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">
+        {label}
+      </span>
+      <pre className="max-h-64 overflow-auto rounded-md bg-muted px-3 py-2 font-mono text-xs leading-relaxed text-foreground">
+        {text}
+      </pre>
+    </div>
+  );
+}
+
+/** Render JSON-Schema constraints (enum/min/max/pattern/default) as compact chips. */
+function propConstraints(p: JsonSchemaProp): string[] {
+  const out: string[] = [];
+  if (p.enum) out.push(`枚举: ${p.enum.map(String).slice(0, 6).join(" | ")}`);
+  if (p.default !== undefined) out.push(`默认 ${JSON.stringify(p.default)}`);
+  if (p.minimum !== undefined) out.push(`≥${p.minimum}`);
+  if (p.maximum !== undefined) out.push(`≤${p.maximum}`);
+  if (p.minLength !== undefined) out.push(`长度≥${p.minLength}`);
+  if (p.maxLength !== undefined) out.push(`长度≤${p.maxLength}`);
+  if (p.pattern) out.push(`匹配 /${p.pattern}/`);
+  return out;
+}
+
+function typeLabel(p: JsonSchemaProp): string {
+  const t = Array.isArray(p.type) ? p.type.join("|") : p.type;
+  if (t === "array" && p.items?.type) return `${p.items.type}[]`;
+  return t || "any";
+}
+
+/** A JSON-Schema property table: 字段 / 类型 / 必填 / 说明 / 约束. */
+function SchemaTable({ schema }: { schema: JsonSchema | null | undefined }) {
+  const props = schema?.properties ?? {};
+  const required = new Set(schema?.required ?? []);
+  const keys = Object.keys(props);
+  if (keys.length === 0) {
+    return <span className="text-sm italic text-muted-foreground/60">无字段定义</span>;
+  }
+  return (
+    <div className="flex flex-col divide-y rounded-md border">
+      {keys.map((k) => {
+        const p = props[k]!;
+        const cons = propConstraints(p);
+        return (
+          <div key={k} className="flex flex-col gap-1 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <code className="font-mono text-xs text-foreground">{k}</code>
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {typeLabel(p)}
+              </Badge>
+              {required.has(k) ? (
+                <Badge variant="destructive" className="font-mono text-[10px]">
+                  必填
+                </Badge>
+              ) : (
+                <span className="text-[10px] text-muted-foreground">可选</span>
+              )}
+            </div>
+            {p.description ? (
+              <span className="text-[11px] text-muted-foreground">{p.description}</span>
+            ) : null}
+            {cons.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {cons.map((c, i) => (
+                  <span key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    {c}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 参数 — input/output JSON-Schema + 示例(this is the big missing piece). */
+function ParamsTab({ tool }: { tool: Tool }) {
+  const { data, isLoading } = useToolSpec(tool.name);
+  if (isLoading) return <EmptyHint>加载参数规格…</EmptyHint>;
+  if (!data) return <EmptyHint>暂无参数规格</EmptyHint>;
+  return (
+    <div className="flex flex-col">
+      <Section label="输入参数 (input schema)">
+        <SchemaTable schema={data.input_schema} />
+      </Section>
+      {data.output_schema?.properties ? (
+        <Section label="输出 (output schema)">
+          <SchemaTable schema={data.output_schema} />
+        </Section>
+      ) : null}
+      {data.example_input != null ? (
+        <Section label="示例">
+          <div className="flex flex-col gap-3">
+            <JsonBlock label="请求示例" value={data.example_input} />
+            {data.example_output != null ? (
+              <JsonBlock label="响应示例" value={data.example_output} />
+            ) : null}
+          </div>
+        </Section>
+      ) : null}
+    </div>
+  );
+}
+
 /** 调用记录 — live recent calls for this tool (who/interface/status/time). */
 function CallsTab({ tool }: { tool: Tool }) {
   const { data, isLoading } = useToolTelemetry(tool.name);
@@ -231,12 +354,30 @@ function CallsTab({ tool }: { tool: Tool }) {
   );
 }
 
-/** 配置 — runtime health + interface config + module path (the "配置记录"). */
+/** A key/value config row. */
+function KV({ k, v }: { k: string; v: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 py-0.5">
+      <span className="w-20 shrink-0 text-[11px] text-muted-foreground">{k}</span>
+      <span className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">{v}</span>
+    </div>
+  );
+}
+
+/** 配置 — health + governance/lifecycle + dependency relations + runtime config + docs. */
 function ConfigTab({ tool }: { tool: Tool }) {
-  const { data } = useToolTelemetry(tool.name);
-  const health = data?.health;
+  const { data: tel } = useToolTelemetry(tool.name);
+  const { data: spec } = useToolSpec(tool.name);
+  const health = tel?.health;
+  const manifest = (spec?.manifest ?? {}) as Record<string, unknown>;
   const stateLabel =
     health?.state === "down" ? "宕机" : health?.state === "degraded" ? "降级" : "运行中";
+  // Consumers = distinct callers seen calling this tool (depended-on-by).
+  const consumers = Array.from(new Set((tel?.calls ?? []).map((c) => c.caller))).slice(0, 12);
+  const deps = (manifest.deps as string[]) ?? tool.deps ?? [];
+  const docs = spec?.docs ?? {};
+  const docList = (["api", "mcp", "cli"] as const).filter((k) => docs[k]);
+
   return (
     <div className="flex flex-col">
       <Section label="运行时健康态">
@@ -253,16 +394,75 @@ function ConfigTab({ tool }: { tool: Tool }) {
           <span className="text-sm italic text-muted-foreground/60">暂无健康数据</span>
         )}
       </Section>
-      <Section label="接口配置">
-        <div className="flex flex-col gap-1.5 font-mono text-xs text-muted-foreground">
-          <div>版本 v{tool.version}</div>
-          <div>状态 {tool.status}</div>
-          <div>类目 {tool.category_zh}</div>
+
+      <Section label="治理 / 生命周期">
+        <div className="flex flex-col">
+          <KV k="状态" v={String(manifest.status ?? tool.status)} />
+          <KV k="版本" v={`v${manifest.version ?? tool.version}`} />
+          <KV k="类目" v={tool.category_zh} />
+          {manifest.pluggable !== undefined ? (
+            <KV k="可插拔" v={manifest.pluggable ? "是" : "否"} />
+          ) : null}
         </div>
       </Section>
-      <Section label="module_path">
-        <code className="break-all font-mono text-xs text-muted-foreground">{tool.module_path}</code>
+
+      <Section label="依赖关系">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+              依赖 (depends-on)
+            </span>
+            {deps.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {deps.map((d) => (
+                  <Badge key={d} variant="secondary" className="font-mono">
+                    {d}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <span className="text-sm italic text-muted-foreground/60">无</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+              被调用方 (consumers · 近期实测)
+            </span>
+            {consumers.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {consumers.map((c) => (
+                  <Badge key={c} variant="outline" className="font-mono text-[10px]">
+                    {c}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <span className="text-sm italic text-muted-foreground/60">近期无调用</span>
+            )}
+          </div>
+        </div>
       </Section>
+
+      <Section label="运行配置">
+        <div className="flex flex-col">
+          {manifest.sandbox_cmd ? <KV k="沙盒自测" v={String(manifest.sandbox_cmd)} /> : null}
+          {manifest.test_cmd ? <KV k="证伪测试" v={String(manifest.test_cmd)} /> : null}
+          <KV k="module" v={tool.module_path} />
+        </div>
+      </Section>
+
+      {docList.length > 0 || spec?.readme ? (
+        <Section label="文档">
+          <div className="flex flex-wrap gap-1.5">
+            {spec?.readme ? <Badge variant="secondary">README</Badge> : null}
+            {docList.map((k) => (
+              <Badge key={k} variant="secondary" className="font-mono">
+                {k.toUpperCase()}.md
+              </Badge>
+            ))}
+          </div>
+        </Section>
+      ) : null}
     </div>
   );
 }

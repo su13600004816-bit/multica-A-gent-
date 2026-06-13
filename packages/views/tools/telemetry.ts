@@ -161,6 +161,50 @@ export function useToolTelemetry(name: string | null) {
   });
 }
 
+// --- tool spec (schema / examples / docs / config) -----------------------------
+
+export interface JsonSchemaProp {
+  type?: string | string[];
+  description?: string;
+  enum?: unknown[];
+  default?: unknown;
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  items?: JsonSchemaProp;
+  properties?: Record<string, JsonSchemaProp>;
+}
+
+export interface JsonSchema {
+  type?: string;
+  required?: string[];
+  properties?: Record<string, JsonSchemaProp>;
+}
+
+export interface ToolSpec {
+  manifest: Record<string, unknown>;
+  input_schema: JsonSchema | null;
+  output_schema: JsonSchema | null;
+  example_input: unknown;
+  example_output: unknown;
+  readme: string | null;
+  docs: { api?: string | null; mcp?: string | null; cli?: string | null };
+}
+
+export function useToolSpec(name: string | null) {
+  return useQuery({
+    queryKey: ["utos-telemetry", "spec", name],
+    enabled: !!name,
+    staleTime: 5 * 60 * 1000, // spec 基本静态,5min 不重取
+    queryFn: async (): Promise<ToolSpec | null> => {
+      const r = await getJSON<{ spec?: ToolSpec }>(`/tool-spec/${encodeURIComponent(name as string)}`);
+      return r.spec ?? null;
+    },
+  });
+}
+
 /** Relative time label, e.g. "12s 前". Pure, no deps. */
 export function timeAgo(ts: number): string {
   const sec = Math.max(0, Math.floor(Date.now() / 1000 - ts));
