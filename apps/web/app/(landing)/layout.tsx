@@ -1,17 +1,20 @@
-import { Instrument_Serif, Noto_Serif_SC } from "next/font/google";
+import localFont from "next/font/local";
 import { LocaleProvider } from "@/features/landing/i18n";
 import { getRequestLocale } from "@/lib/request-locale";
 
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
+// Self-hosted (next/font/local) — hermetic build, no Google Fonts egress. See app/layout.tsx.
+const instrumentSerif = localFont({
+  src: "../fonts/InstrumentSerif.woff2",
   weight: "400",
   variable: "--font-serif",
+  display: "swap",
 });
 
-const notoSerifSC = Noto_Serif_SC({
-  subsets: ["latin"],
+const notoSerifSC = localFont({
+  src: "../fonts/NotoSerifSC.woff2",
   weight: "400",
   variable: "--font-serif-zh",
+  display: "swap",
 });
 
 const jsonLd = {

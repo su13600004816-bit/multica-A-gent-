@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Geist_Mono, Source_Serif_4 } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@multica/ui/components/ui/sonner";
 import { cn } from "@multica/ui/lib/utils";
@@ -19,27 +19,40 @@ import "./globals.css";
 // stack), and a hashed family name can only be referenced from CSS via a variable.
 // Keeping the CJK chain in CSS also keeps it CSP-safe and in sync with the desktop
 // app, which defines the same chain in apps/desktop/src/renderer/src/globals.css.
-const inter = Inter({
-  subsets: ["latin"],
+// Fonts are self-hosted (next/font/local) instead of next/font/google: builds
+// must NOT depend on build-time foreign egress (Google Fonts) — the egress
+// firewall blocks direct foreign fetches, and hermetic builds work offline / in
+// locked networks. The woff2 files are latin-subset variable fonts (~20-50KB ea),
+// downloaded once from Google Fonts. Same hashed-family + size-adjusted fallback
+// behaviour as before.
+const inter = localFont({
+  src: "./fonts/Inter.woff2",
+  weight: "100 900",
   variable: "--font-inter",
+  display: "swap",
 });
 // Mono font has no explicit CJK fallback: CJK chars in code blocks are inherently
 // non-aligned with a mono grid (Chinese is proportional), so listing CJK fonts
 // here would falsely signal alignment guarantees. Browser default fallback handles
 // the rare mixed case correctly.
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
+const geistMono = localFont({
+  src: "./fonts/GeistMono.woff2",
+  weight: "100 900",
   variable: "--font-mono",
+  display: "swap",
   fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
 });
 // Editorial serif used for onboarding headlines. Italic support for h1 em
 // accents (e.g. "...on one shared board."). Only loaded on routes that
 // render the font; layout-shift-prevention handled by next/font's synthetic
 // fallback metrics, same as Inter.
-const sourceSerif = Source_Serif_4({
-  subsets: ["latin"],
-  style: ["normal", "italic"],
+const sourceSerif = localFont({
+  src: [
+    { path: "./fonts/SourceSerif4.woff2", style: "normal", weight: "200 900" },
+    { path: "./fonts/SourceSerif4-Italic.woff2", style: "italic", weight: "200 900" },
+  ],
   variable: "--font-serif",
+  display: "swap",
   fallback: [
     "ui-serif",
     "Iowan Old Style",
