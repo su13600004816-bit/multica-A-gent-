@@ -36,6 +36,7 @@ import {
   Users,
   Workflow,
   Wrench,
+  Activity,
 } from "lucide-react";
 import { WorkspaceAvatar } from "../workspace/workspace-avatar";
 import { ActorAvatar } from "@multica/ui/components/common/actor-avatar";
@@ -116,6 +117,7 @@ type NavKey =
   | "squads"
   | "logic"
   | "tools"
+  | "callBoard"
   | "usage"
   | "runtimes"
   | "skills"
@@ -132,6 +134,7 @@ type NavLabelKey =
   | "squads"
   | "logic"
   | "tools"
+  | "call_board"
   | "usage"
   | "runtimes"
   | "skills"
@@ -150,6 +153,7 @@ const workspaceNav: { key: NavKey; labelKey: NavLabelKey; icon: typeof Inbox }[]
   { key: "squads", labelKey: "squads", icon: Users },
   { key: "logic", labelKey: "logic", icon: Workflow },
   { key: "tools", labelKey: "tools", icon: Wrench },
+  { key: "callBoard", labelKey: "call_board", icon: Activity },
   { key: "usage", labelKey: "usage", icon: BarChart3 },
 ];
 

@@ -12,7 +12,8 @@
     "usage": "사용량",
     "runtimes": "런타임",
     "skills": "스킬",
-    "settings": "설정"
+    "settings": "설정",
+    "call_board": "호출 보드"
   },
   "help": {
     "trigger": "도움말",

@@ -12,7 +12,8 @@
     "usage": "用量",
     "runtimes": "运行时",
     "skills": "Skills",
-    "settings": "设置"
+    "settings": "设置",
+    "call_board": "调用看板"
   },
   "help": {
     "trigger": "帮助",

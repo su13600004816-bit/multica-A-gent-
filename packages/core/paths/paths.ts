@@ -33,6 +33,7 @@ function workspaceScoped(slug: string) {
     logic: () => `${ws}/logic`,
     tools: () => `${ws}/tools`,
     toolDetail: (id: string) => `${ws}/tools/${encode(id)}`,
+    callBoard: () => `${ws}/tools/board`,
     inbox: () => `${ws}/inbox`,
     myIssues: () => `${ws}/my-issues`,
     runtimes: () => `${ws}/runtimes`,
