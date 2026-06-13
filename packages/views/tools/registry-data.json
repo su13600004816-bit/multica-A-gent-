@@ -1,0 +1,4265 @@
+{
+"generated": "2026-06-13",
+"total": 269,
+"tools": [
+{
+"name": "api-gateway",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "API 网关，统一提供 `POST /utos/tools/<name>` 机器调用入口、鉴权、限流、审计。",
+"interfaces": {
+"cli": "utos tool api-gateway check --input <input.json>",
+"mcp": "tool.i.api-gateway",
+"api": "POST /utos/tools/api-gateway"
+},
+"deps": [
+"rbac-auth"
+],
+"status": "built",
+"module_path": "tools/I_interface_exposure/api-gateway"
+},
+{
+"name": "backpressure-broker",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 · extra-39 · backpressure-broker（A平台编排 / I接口暴露）",
+"interfaces": {
+"cli": "utos tool backpressure-broker execute --input <input.json>",
+"mcp": "tool.i.backpressure-broker",
+"api": "POST /utos/tools/backpressure-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/I_interface_exposure/backpressure-broker"
+},
+{
+"name": "cli-dispatcher",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "CLI 派发器，统一解析 `utos tool <name> <action>` 并转发到同一份工具核心契约。",
+"interfaces": {
+"cli": "utos tool cli-dispatcher dispatch --input <input.json>",
+"mcp": "tool.i.cli-dispatcher",
+"api": "POST /utos/tools/cli-dispatcher"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/I_interface_exposure/cli-dispatcher"
+},
+{
+"name": "contract-version-negotiator",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "extra-62 · contract-version-negotiator（契约版本协商网关 · I 接口暴露）",
+"interfaces": {
+"cli": "utos tool contract-version-negotiator execute --input <input.json>",
+"mcp": "tool.i.contract-version-negotiator",
+"api": "POST /utos/tools/contract-version-negotiator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/I_interface_exposure/contract-version-negotiator"
+},
+{
+"name": "flowmap-mcp-server",
+"category": "I_interface_exposure",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "把 FlowMap 工具和代码图谱查询能力暴露给 Claude、Codex、Qwen 等模型通过 MCP 调用。",
+"interfaces": {
+"cli": "utos tool flowmap-mcp-server <action> --payload ./input.json",
+"mcp": "tool.I_interface_exposure.flowmap-mcp-server",
+"api": "POST /utos/tools/flowmap-mcp-server"
+},
+"deps": [
+"code-knowledge-graph-store",
+"artifact-contract-validator"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/flowmap-mcp-server"
+},
+{
+"name": "handle-epoch-guard",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "拦 D1 extra-23 —— MCP/registry 句柄带 epoch，落地 write/callback 前强制校验，不符则安全 abort + 补偿，**绝不许悬空落地**。",
+"interfaces": {
+"cli": "utos tool handle-epoch-guard execute --input <input.json>",
+"mcp": "tool.i.handle-epoch-guard",
+"api": "POST /utos/tools/handle-epoch-guard"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/I_interface_exposure/handle-epoch-guard"
+},
+{
+"name": "instance-identity-assert",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "UTOS 工具集众长方案 · extra-18",
+"interfaces": {
+"cli": "utos tool instance-identity-assert execute --input <input.json>",
+"mcp": "tool.i.instance-identity-assert",
+"api": "POST /utos/tools/instance-identity-assert"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/I_interface_exposure/instance-identity-assert"
+},
+{
+"name": "mcp-server",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "MCP Server 统一暴露工具给 AI 模型调用，负责 tool schema、权限、路由与调用审计。",
+"interfaces": {
+"cli": "utos tool mcp-server execute --input <input.json>",
+"mcp": "tool.i.mcp-server",
+"api": "POST /utos/tools/mcp-server"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/I_interface_exposure/mcp-server"
+},
+{
+"name": "tool-port-broker",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "解决「谁在哪个 api/mcp/cli，一个工具的三接口/MCP-name/路由到底落在哪、谁能调、调不通时怎么定位」——它是工具库的**电话簿+话务台**。",
+"interfaces": {
+"cli": "utos tool tool-port-broker execute --input <input.json>",
+"mcp": "tool.i.tool-port-broker",
+"api": "POST /utos/tools/tool-port-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/I_interface_exposure/tool-port-broker"
+},
+{
+"name": "tool-protocol-gateway",
+"category": "I_interface_exposure",
+"category_zh": "接口暴露",
+"version": "0.1.0",
+"description": "工具协议网关：强制 ToolCallEnvelope、版本协商、身份、幂等键、deadline、trace 字段。",
+"interfaces": {
+"cli": "utos tool tool-protocol-gateway execute --input <input.json>",
+"mcp": "tool.i.tool-protocol-gateway",
+"api": "POST /utos/tools/tool-protocol-gateway"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/I_interface_exposure/tool-protocol-gateway"
+},
+{
+"name": "bom-decomposer",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "BOM 任务拆解：三视角/九层拆解，将项目合同拆成可派发任务和依赖图。",
+"interfaces": {
+"cli": "utos tool bom-decomposer execute --input <input.json>",
+"mcp": "tool.a.bom-decomposer",
+"api": "POST /utos/tools/bom-decomposer"
+},
+"deps": [
+"vuln-fractal-decompose",
+"model-router"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/bom-decomposer"
+},
+{
+"name": "canvas-module-adapter",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "画布模块适配器：把工具 manifest 转为可拖拽节点、端口、连线、校验规则和运行参数面板。",
+"interfaces": {
+"cli": "utos tool canvas-module-adapter execute --input <input.json>",
+"mcp": "tool.a.canvas-module-adapter",
+"api": "POST /utos/tools/canvas-module-adapter"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/A_platform_orchestration/canvas-module-adapter"
+},
+{
+"name": "canvas-orchestrator",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "画布编排：手工拼装无限画布、工作流定义、节点连线、工具拖拽与执行状态管理。",
+"interfaces": {
+"cli": "utos tool canvas-orchestrator execute --input <input.json>",
+"mcp": "tool.a.canvas-orchestrator",
+"api": "POST /utos/tools/canvas-orchestrator"
+},
+"deps": [
+"event-bus"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/canvas-orchestrator"
+},
+{
+"name": "code-graph-refresh-pipeline",
+"category": "A_platform_orchestration",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "编排 Git/PR/定时触发、索引、图谱写入、MCP 发布、知识库生成的完整刷新流程。",
+"interfaces": {
+"cli": "utos tool code-graph-refresh-pipeline <action> --payload ./input.json",
+"mcp": "tool.A_platform_orchestration.code-graph-refresh-pipeline",
+"api": "POST /utos/tools/code-graph-refresh-pipeline"
+},
+"deps": [
+"repo-change-trigger",
+"code-indexer",
+"code-knowledge-graph-store",
+"flowmap-mcp-server",
+"deepwiki-page-generator"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/code-graph-refresh-pipeline"
+},
+{
+"name": "concurrency-arbiter",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "同 issue 同意图归并为单一有效 run，所有派发走 compare-and-set（CAS），杀 TOCTOU 重复派。",
+"interfaces": {
+"cli": "utos tool concurrency-arbiter execute --input <input.json>",
+"mcp": "tool.a.concurrency-arbiter",
+"api": "POST /utos/tools/concurrency-arbiter"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/concurrency-arbiter"
+},
+{
+"name": "concurrency-chaos-injector",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "可复现地把\"编排两条线 + saga\"驱到**指定交错点**（W1 / 补偿撞前进 / rm-vs-fsync），在那一点注入超时·崩溃·重投，断言**装协调器前必脏、装协调器后必收敛**——本场 ASWI「先红后绿」回归的执行载体。",
+"interfaces": {
+"cli": "utos tool concurrency-chaos-injector execute --input <input.json>",
+"mcp": "tool.a.concurrency-chaos-injector",
+"api": "POST /utos/tools/concurrency-chaos-injector"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/concurrency-chaos-injector"
+},
+{
+"name": "config-baseline-registry",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 · OSS 集成方案",
+"interfaces": {
+"cli": "utos tool config-baseline-registry execute --input <input.json>",
+"mcp": "tool.a.config-baseline-registry",
+"api": "POST /utos/tools/config-baseline-registry"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/config-baseline-registry"
+},
+{
+"name": "config-composer",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "拼装时把被组合工具各自的 `default / baseline / env-override` 合成为一份**组合有效配置 (effective config)**，跑**跨工具约束校验**（容量不等式 / 单位一致 / 阈值联动），矛盾组合**直接拒绝上线**，并产出**可被 trace 引用的 effective-config 快照**。",
+"interfaces": {
+"cli": "utos tool config-composer execute --input <input.json>",
+"mcp": "tool.a.config-composer",
+"api": "POST /utos/tools/config-composer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/config-composer"
+},
+{
+"name": "consistent-cut-snapshotter",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深拆方案 · extra-107 · consistent-cut-snapshotter（一致性切面快照器）",
+"interfaces": {
+"cli": "utos tool consistent-cut-snapshotter execute --input <input.json>",
+"mcp": "tool.a.consistent-cut-snapshotter",
+"api": "POST /utos/tools/consistent-cut-snapshotter"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/consistent-cut-snapshotter"
+},
+{
+"name": "context-propagation-anchor",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案 · `context-propagation-anchor`（异步关联上下文锚定器）",
+"interfaces": {
+"cli": "utos tool context-propagation-anchor execute --input <input.json>",
+"mcp": "tool.a.context-propagation-anchor",
+"api": "POST /utos/tools/context-propagation-anchor"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/context-propagation-anchor"
+},
+{
+"name": "data-visibility-projection-binder",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "物化那一刻按当时 identity 算 `visibility_fingerprint = hash(identity_class, tenant_id, scope, field_set, ts)`，把它绑进 envelope / outputs / 证据 / 记忆；消费侧 `assert_visible(consumer_identity, fingerprint)`，身份不匹配即**拒读或重投影**。",
+"interfaces": {
+"cli": "utos tool data-visibility-projection-binder execute --input <input.json>",
+"mcp": "tool.a.data-visibility-projection-binder",
+"api": "POST /utos/tools/data-visibility-projection-binder"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/data-visibility-projection-binder"
+},
+{
+"name": "dependency-graph-blast-radius-mapper",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "从所有 `manifest.deps` 构建工具依赖 DAG，标出 hub 高 fan-in 节点、算某工具崩的级联爆炸半径，并校验依赖是否被完整声明（解隐藏 fan-in）。",
+"interfaces": {
+"cli": "utos tool dependency-graph-blast-radius-mapper execute --input <input.json>",
+"mcp": "tool.a.dependency-graph-blast-radius-mapper",
+"api": "POST /utos/tools/dependency-graph-blast-radius-mapper"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/dependency-graph-blast-radius-mapper"
+},
+{
+"name": "dependency-resolution-lock-broker",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "与 `dependency-graph-resolver` **互补**——后者解**数据(边)上的静态环**(编译期/解析前)，本工具解**运行期锁等待图(wait-for graph)上的环**。对象不同(静态依赖边 vs 运行期锁等待边)、时机不同(解析前 vs 解析中)、控制不同(拒绝坏图 vs 仲裁活跃竞争)，**必须独立**。",
+"interfaces": {
+"cli": "utos tool dependency-resolution-lock-broker execute --input <input.json>",
+"mcp": "tool.a.dependency-resolution-lock-broker",
+"api": "POST /utos/tools/dependency-resolution-lock-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/dependency-resolution-lock-broker"
+},
+{
+"name": "deploy-mutex-lease",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "extra-8 · 部署互斥租约器 deploy-mutex-lease",
+"interfaces": {
+"cli": "utos tool deploy-mutex-lease execute --input <input.json>",
+"mcp": "tool.a.deploy-mutex-lease",
+"api": "POST /utos/tools/deploy-mutex-lease"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/deploy-mutex-lease"
+},
+{
+"name": "dispatch-consume-reconciler",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "强制每个 run 的 `dispatched ↔ consumed` 严格配对；未配对的派发记录进**待对账冻结区**（quarantine）而非交看门狗续派——从燃料端掐断自燃死循环。",
+"interfaces": {
+"cli": "utos tool dispatch-consume-reconciler execute --input <input.json>",
+"mcp": "tool.a.dispatch-consume-reconciler",
+"api": "POST /utos/tools/dispatch-consume-reconciler"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/dispatch-consume-reconciler"
+},
+{
+"name": "dispatch-dedup",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "派发去重：避免同一任务重复派发、重复执行、重复签收。",
+"interfaces": {
+"cli": "utos tool dispatch-dedup dedup --input <input.json>",
+"mcp": "tool.a.dispatch-dedup",
+"api": "POST /utos/tools/dispatch-dedup"
+},
+"deps": [
+"task-dispatcher",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/dispatch-dedup"
+},
+{
+"name": "distributed-lease-lock",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "对 **owned_path / PR 号 / registry 行** 提供 **原子 CAS + 租约 TTL + 前缀包含互斥 + 统一锁序 + 到期自动释放**，从机制上挡掉 **TOCTOU / 物理脏写 / 死锁** 三类病根。",
+"interfaces": {
+"cli": "utos tool distributed-lease-lock execute --input <input.json>",
+"mcp": "tool.a.distributed-lease-lock",
+"api": "POST /utos/tools/distributed-lease-lock"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/distributed-lease-lock"
+},
+{
+"name": "durable-saga-log",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "把\"补偿计划 + 执行进度\"落到 durable store；编排器崩溃重启后，从日志**续补**未完成的 compensate，挡住\"补偿做了一半就断电忘了做哪步\"。",
+"interfaces": {
+"cli": "utos tool durable-saga-log execute --input <input.json>",
+"mcp": "tool.a.durable-saga-log",
+"api": "POST /utos/tools/durable-saga-log"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/durable-saga-log"
+},
+{
+"name": "event-bus",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "事件总线：完成、失败、返工、签收等事件广播与下一步触发。",
+"interfaces": {
+"cli": "utos tool event-bus execute --input <input.json>",
+"mcp": "tool.a.event-bus",
+"api": "POST /utos/tools/event-bus"
+},
+"deps": [
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/event-bus"
+},
+{
+"name": "fair-scheduler",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "给下游每类消费者声明并发上限 + 公平配额按 credit 加权轮转，防一路独占单 AVD 槽位 / trace I/O；替线运行器固定 tick 做细粒度让渡 —— 挡 DM-4 extra-45。",
+"interfaces": {
+"cli": "utos tool fair-scheduler execute --input <input.json>",
+"mcp": "tool.a.fair-scheduler",
+"api": "POST /utos/tools/fair-scheduler"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/fair-scheduler"
+},
+{
+"name": "fallback-degrade-router",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "H（任一被依赖工具/模型/外部服务）不可用时，把 caller 路由到**降级路径**（缓存 / 默认值 / 排队待办 / 副本），让**单依赖崩溃 ≠ 整条流崩溃**。",
+"interfaces": {
+"cli": "utos tool fallback-degrade-router execute --input <input.json>",
+"mcp": "tool.a.fallback-degrade-router",
+"api": "POST /utos/tools/fallback-degrade-router"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/fallback-degrade-router"
+},
+{
+"name": "fanout-idempotency-tool",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "extra-71 · fanout-idempotency-tool（A 平台编排）OSS 集成方案",
+"interfaces": {
+"cli": "utos tool fanout-idempotency-tool execute --input <input.json>",
+"mcp": "tool.a.fanout-idempotency-tool",
+"api": "POST /utos/tools/fanout-idempotency-tool"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/fanout-idempotency-tool"
+},
+{
+"name": "fencing-token-broker",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "对**被锁 / 被 saga 接管 / 需幂等保护**的对象签发**单调递增 fencing token（epoch）**；lock-lease / saga / idempotency 的写操作必须携带并校验该 token，**过期 token 一律拒绝并审计**。专堵 **G-S1（旧持有者僵尸写 / split-brain 写穿）**。",
+"interfaces": {
+"cli": "utos tool fencing-token-broker execute --input <input.json>",
+"mcp": "tool.a.fencing-token-broker",
+"api": "POST /utos/tools/fencing-token-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/fencing-token-broker"
+},
+{
+"name": "flowmap-intake",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "碎片化提问入口：收集用户零散想法，形成需求事件流和待澄清问题。",
+"interfaces": {
+"cli": "utos tool flowmap-intake create --input <input.json>",
+"mcp": "tool.a.flowmap-intake",
+"api": "POST /utos/tools/flowmap-intake"
+},
+"deps": [
+"model-router",
+"content-isolation"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/flowmap-intake"
+},
+{
+"name": "hotplug-drain-barrier",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · extra-27（宪法增订建议·第10条 可静默热插拔）· OSS 集众长方案",
+"interfaces": {
+"cli": "utos tool hotplug-drain-barrier execute --input <input.json>",
+"mcp": "tool.a.hotplug-drain-barrier",
+"api": "POST /utos/tools/hotplug-drain-barrier"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/hotplug-drain-barrier"
+},
+{
+"name": "hybrid-clock-stamper",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 + OSS 集成方案 · extra-134",
+"interfaces": {
+"cli": "utos tool hybrid-clock-stamper execute --input <input.json>",
+"mcp": "tool.a.hybrid-clock-stamper",
+"api": "POST /utos/tools/hybrid-clock-stamper"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/hybrid-clock-stamper"
+},
+{
+"name": "idempotent-reinject-key",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "看门狗/CLI 每次重派必须携带\"逻辑任务幂等键\"，把\"同一逻辑任务\"折叠成\"同一个 run\"，从源头消灭 880-run 自燃。",
+"interfaces": {
+"cli": "utos tool idempotent-reinject-key execute --input <input.json>",
+"mcp": "tool.a.idempotent-reinject-key",
+"api": "POST /utos/tools/idempotent-reinject-key"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/idempotent-reinject-key"
+},
+{
+"name": "interop-protocol",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · OSS 集成方案：工具互通协议 `interop-protocol`",
+"interfaces": {
+"cli": "utos tool interop-protocol execute --input <input.json>",
+"mcp": "tool.a.interop-protocol",
+"api": "POST /utos/tools/interop-protocol"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/interop-protocol"
+},
+{
+"name": "join-barrier-tool",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "扇出汇聚屏障**——声明 `quorum=N`，等齐 `N ∧ 全员written ∧ 全员audited` 才放行；超时降级为**显式 FAIL**（非静默放行）；**无锁有界等待**防死锁。挡 D1/D6/D7/D8 extra-69。",
+"interfaces": {
+"cli": "utos tool join-barrier-tool execute --input <input.json>",
+"mcp": "tool.a.join-barrier-tool",
+"api": "POST /utos/tools/join-barrier-tool"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/join-barrier-tool"
+},
+{
+"name": "line-runner",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "线运行器：通用图执行器，按 DAG/状态机运行多 Agent 生产线。",
+"interfaces": {
+"cli": "utos tool line-runner run --input <input.json>",
+"mcp": "tool.a.line-runner",
+"api": "POST /utos/tools/line-runner"
+},
+"deps": [
+"event-bus",
+"admission-gate",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/line-runner"
+},
+{
+"name": "load-order-orchestrator",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "基于无环依赖图算确定性拓扑启动序，把「保护类/背压下游 ready」作为上游启动前置，**根治启动死锁 + 上游先跑下游没接住**。",
+"interfaces": {
+"cli": "utos tool load-order-orchestrator execute --input <input.json>",
+"mcp": "tool.a.load-order-orchestrator",
+"api": "POST /utos/tools/load-order-orchestrator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/load-order-orchestrator"
+},
+{
+"name": "logic-diagram",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "逻辑图/流程图编辑：维护机器可读流程图 JSON，并渲染 Mermaid/画布图。",
+"interfaces": {
+"cli": "utos tool logic-diagram execute --input <input.json>",
+"mcp": "tool.a.logic-diagram",
+"api": "POST /utos/tools/logic-diagram"
+},
+"deps": [
+"visualization"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/logic-diagram"
+},
+{
+"name": "materialized-view-invalidation-broadcaster",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 · OSS 集成方案",
+"interfaces": {
+"cli": "utos tool materialized-view-invalidation-broadcaster execute --input <input.json>",
+"mcp": "tool.a.materialized-view-invalidation-broadcaster",
+"api": "POST /utos/tools/materialized-view-invalidation-broadcaster"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/materialized-view-invalidation-broadcaster"
+},
+{
+"name": "module-marketplace-manager",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "模块市场管理器：按分类展示可安装/可删除/可启停工具模块，支持版本与依赖提示。",
+"interfaces": {
+"cli": "utos tool module-marketplace-manager execute --input <input.json>",
+"mcp": "tool.a.module-marketplace-manager",
+"api": "POST /utos/tools/module-marketplace-manager"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/A_platform_orchestration/module-marketplace-manager"
+},
+{
+"name": "nocode-flow-generator",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "无代码流程图生成器：从 Prototyping 文档生成机器可读 IntentGraph/NoCodeFlow。",
+"interfaces": {
+"cli": "utos tool nocode-flow-generator generate --input <input.json>",
+"mcp": "tool.a.nocode-flow-generator",
+"api": "POST /utos/tools/nocode-flow-generator"
+},
+"deps": [
+"prototype-doc-generator",
+"logic-diagram",
+"json-convert"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/nocode-flow-generator"
+},
+{
+"name": "orphan-resource-reaper",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "周期扫 `compensating > N min 未达终态` / `占位无活 worker 心跳` / `enabled 但实例已死的 registry 行` → GC + 告警，兜底挡「孤儿占位毒化 / 幽灵行」。",
+"interfaces": {
+"cli": "utos tool orphan-resource-reaper execute --input <input.json>",
+"mcp": "tool.a.orphan-resource-reaper",
+"api": "POST /utos/tools/orphan-resource-reaper"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/orphan-resource-reaper"
+},
+{
+"name": "owned-path-lock",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "etcd 出 epoch+TTL 的\"内核安全\"，fencelock 出 holder 凭证的\"防误抢\"，ZK/Consul 出\"会话即租约\"的\"防死等\"，sherlock 出\"后端无关\"的\"可迭代\"，Redlock 出\"别这么干\"的反面教训。",
+"interfaces": {
+"cli": "utos tool owned-path-lock execute --input <input.json>",
+"mcp": "tool.a.owned-path-lock",
+"api": "POST /utos/tools/owned-path-lock"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/owned-path-lock"
+},
+{
+"name": "renew-fail-fencer",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "etcd 当\"续约失败的真相\"，DBOS 思路当\"写的最后一道闸\"，Temporal 当\"出事后的回滚手\"，breaker 当\"别自燃的脑子\"，OTel 当\"事后能查的账\"，SyncGuard 当\"画布能用的口\"。",
+"interfaces": {
+"cli": "utos tool renew-fail-fencer execute --input <input.json>",
+"mcp": "tool.a.renew-fail-fencer",
+"api": "POST /utos/tools/renew-fail-fencer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/renew-fail-fencer"
+},
+{
+"name": "saga-compensation-coordinator",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · OSS 集成方案：saga-compensation-coordinator（saga 补偿协调器 · 守卫加固版）",
+"interfaces": {
+"cli": "utos tool saga-compensation-coordinator execute --input <input.json>",
+"mcp": "tool.a.saga-compensation-coordinator",
+"api": "POST /utos/tools/saga-compensation-coordinator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/saga-compensation-coordinator"
+},
+{
+"name": "scheduler-cron",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "调度/定时：周期任务、延迟任务、重试任务、巡检任务。",
+"interfaces": {
+"cli": "utos tool scheduler-cron execute --input <input.json>",
+"mcp": "tool.a.scheduler-cron",
+"api": "POST /utos/tools/scheduler-cron"
+},
+"deps": [
+"event-bus"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/scheduler-cron"
+},
+{
+"name": "slot-claim-coordinator",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "G-S5 的根因不是\"锁不够强\"，而是编排元层把\"挑槽\"和\"占槽\"拆成了两步、且崩溃后不回收、陈旧持有方不被拒。** 名家们各自只解决其中一段，本工具把三段缝成一个原子契约。",
+"interfaces": {
+"cli": "utos tool slot-claim-coordinator execute --input <input.json>",
+"mcp": "tool.a.slot-claim-coordinator",
+"api": "POST /utos/tools/slot-claim-coordinator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/slot-claim-coordinator"
+},
+{
+"name": "slow-start-governor",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "总线/下游重启后用**漏桶式渐进放量(slow-start ramp-up)**恢复流量,并给上游装**断路器**;探测到下游 `open` 时上游退避,**避免二次洪峰(thundering herd / 二次雪崩)**——挡 DM-6 extra-42。",
+"interfaces": {
+"cli": "utos tool slow-start-governor execute --input <input.json>",
+"mcp": "tool.a.slow-start-governor",
+"api": "POST /utos/tools/slow-start-governor"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/slow-start-governor"
+},
+{
+"name": "squad-dispatch-planner",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "生产线小队派发规划器：根据 TaskGraph 分配写码、审计、截图、VM、PR 等角色。",
+"interfaces": {
+"cli": "utos tool squad-dispatch-planner dispatch --input <input.json>",
+"mcp": "tool.a.squad-dispatch-planner",
+"api": "POST /utos/tools/squad-dispatch-planner"
+},
+"deps": [
+"task-graph-generator",
+"task-dispatcher",
+"admission-gate"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/squad-dispatch-planner"
+},
+{
+"name": "task-board",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "任务看板：多视图、拖拽、状态流转、任务详情、证据入口。",
+"interfaces": {
+"cli": "utos tool task-board execute --input <input.json>",
+"mcp": "tool.a.task-board",
+"api": "POST /utos/tools/task-board"
+},
+"deps": [
+"task-dispatcher",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/task-board"
+},
+{
+"name": "task-dispatcher",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "任务派发器：主干派发原语，把任务按依赖、角色、小队和准入闸分发。",
+"interfaces": {
+"cli": "utos tool task-dispatcher dispatch --input <input.json>",
+"mcp": "tool.a.task-dispatcher",
+"api": "POST /utos/tools/task-dispatcher"
+},
+"deps": [
+"admission-gate",
+"event-bus"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/task-dispatcher"
+},
+{
+"name": "task-graph-generator",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "任务图生成器：把开发文件包拆成 TaskGraph、依赖、负责人和验收矩阵。",
+"interfaces": {
+"cli": "utos tool task-graph-generator generate --input <input.json>",
+"mcp": "tool.a.task-graph-generator",
+"api": "POST /utos/tools/task-graph-generator"
+},
+"deps": [
+"dev-file-pack-generator",
+"bom-decomposer",
+"task-dispatcher"
+],
+"status": "built",
+"module_path": "tools/A_platform_orchestration/task-graph-generator"
+},
+{
+"name": "terminal-absorption-gate-extra-91",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深挖 · OSS 集众长方案 · `extra-91`",
+"interfaces": {
+"cli": "utos tool terminal-absorption-gate-extra-91 execute --input <input.json>",
+"mcp": "tool.a.terminal-absorption-gate-extra-91",
+"api": "POST /utos/tools/terminal-absorption-gate-extra-91"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/terminal-absorption-gate-extra-91"
+},
+{
+"name": "tool-authz-mesh",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "提供 `enforce(subject, tool, action, object) → permit/deny`，被 composer/scheduler/connector 在**执行点**强制调用，补 CG-2/CG-8 缺的**编排授权闸**。",
+"interfaces": {
+"cli": "utos tool tool-authz-mesh execute --input <input.json>",
+"mcp": "tool.a.tool-authz-mesh",
+"api": "POST /utos/tools/tool-authz-mesh"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-authz-mesh"
+},
+{
+"name": "tool-composer",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "工具深度拆解：tool-composer（工具组合器 / 拼积木引擎）",
+"interfaces": {
+"cli": "utos tool tool-composer execute --input <input.json>",
+"mcp": "tool.a.tool-composer",
+"api": "POST /utos/tools/tool-composer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-composer"
+},
+{
+"name": "tool-connector",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · 工具互通插拔器 `tool-connector`",
+"interfaces": {
+"cli": "utos tool tool-connector execute --input <input.json>",
+"mcp": "tool.a.tool-connector",
+"api": "POST /utos/tools/tool-connector"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-connector"
+},
+{
+"name": "tool-dependency-graph",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "在 UTOS「一切皆工具」宇宙里，给任意节点（工具 / 线 / 代理 / 画布节点 / 数据命名空间）画出**正反向依赖图**，回答「删了/改了/停了 X，会断谁」，是 §4「可增删」+ §8「零交叉影响」的**事前预演眼睛**——拆离器拆任何东西之前先看这只眼睛。",
+"interfaces": {
+"cli": "utos tool tool-dependency-graph execute --input <input.json>",
+"mcp": "tool.a.tool-dependency-graph",
+"api": "POST /utos/tools/tool-dependency-graph"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-dependency-graph"
+},
+{
+"name": "tool-execution-broker",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "工具执行经纪人：画布、API、MCP、CLI 的调用统一排队、限流、路由到容器运行时。",
+"interfaces": {
+"cli": "utos tool tool-execution-broker execute --input <input.json>",
+"mcp": "tool.a.tool-execution-broker",
+"api": "POST /utos/tools/tool-execution-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/A_platform_orchestration/tool-execution-broker"
+},
+{
+"name": "tool-lock-lease",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 · 集众长 OSS 集成方案",
+"interfaces": {
+"cli": "utos tool tool-lock-lease execute --input <input.json>",
+"mcp": "tool.a.tool-lock-lease",
+"api": "POST /utos/tools/tool-lock-lease"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-lock-lease"
+},
+{
+"name": "tool-mesh-audit-spine",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "extra-117 · tool-mesh-audit-spine（网格审计脊柱） — 集众长 OSS 集成方案",
+"interfaces": {
+"cli": "utos tool tool-mesh-audit-spine execute --input <input.json>",
+"mcp": "tool.a.tool-mesh-audit-spine",
+"api": "POST /utos/tools/tool-mesh-audit-spine"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-mesh-audit-spine"
+},
+{
+"name": "tool-registry-manager",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS「一切皆工具」平台的元层中枢——工具的**注册 / 发现 / 启停 / 版本**。",
+"interfaces": {
+"cli": "utos tool tool-registry-manager execute --input <input.json>",
+"mcp": "tool.a.tool-registry-manager",
+"api": "POST /utos/tools/tool-registry-manager"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-registry-manager"
+},
+{
+"name": "tool-saga-coordinator",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · OSS 集成方案：tool-saga-coordinator（跨工具事务/补偿协调）",
+"interfaces": {
+"cli": "utos tool tool-saga-coordinator execute --input <input.json>",
+"mcp": "tool.a.tool-saga-coordinator",
+"api": "POST /utos/tools/tool-saga-coordinator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-saga-coordinator"
+},
+{
+"name": "tool-scheduler",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · 工具调度器 tool-scheduler（集众长 OSS 集成方案）",
+"interfaces": {
+"cli": "utos tool tool-scheduler execute --input <input.json>",
+"mcp": "tool.a.tool-scheduler",
+"api": "POST /utos/tools/tool-scheduler"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-scheduler"
+},
+{
+"name": "tool-state-consistency-plane",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "类目 **D 记忆数据**（与 记忆储存/分层、转json 并列；权威态控制面，被 A 平台编排/B 验证治理 全线依赖）",
+"interfaces": {
+"cli": "utos tool tool-state-consistency-plane execute --input <input.json>",
+"mcp": "tool.a.tool-state-consistency-plane",
+"api": "POST /utos/tools/tool-state-consistency-plane"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/tool-state-consistency-plane"
+},
+{
+"name": "tool-state-machine-engine",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "工具状态机引擎：管理 draft/planned/built/validated/enabled/running/degraded/disabled/deprecated 等生命周期。",
+"interfaces": {
+"cli": "utos tool tool-state-machine-engine execute --input <input.json>",
+"mcp": "tool.a.tool-state-machine-engine",
+"api": "POST /utos/tools/tool-state-machine-engine"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/A_platform_orchestration/tool-state-machine-engine"
+},
+{
+"name": "trigger-coalescer",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "extra-5 · 触发源合流器 trigger-coalescer（含原子熔断开关 atomic-circuit-breaker）",
+"interfaces": {
+"cli": "utos tool trigger-coalescer execute --input <input.json>",
+"mcp": "tool.a.trigger-coalescer",
+"api": "POST /utos/tools/trigger-coalescer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/trigger-coalescer"
+},
+{
+"name": "trigger-coordinator",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "工具 extra-90 · K-Trigger-Coordinator 跨触发源协调总线",
+"interfaces": {
+"cli": "utos tool trigger-coordinator execute --input <input.json>",
+"mcp": "tool.a.trigger-coordinator",
+"api": "POST /utos/tools/trigger-coordinator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/trigger-coordinator"
+},
+{
+"name": "version-affinity-gate",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "extra-68 · 版本亲和编排闸（version-affinity-gate）— OSS 集成方案",
+"interfaces": {
+"cli": "utos tool version-affinity-gate execute --input <input.json>",
+"mcp": "tool.a.version-affinity-gate",
+"api": "POST /utos/tools/version-affinity-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/version-affinity-gate"
+},
+{
+"name": "version-affinity-router",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "灰度期把同一 `saga_id` / 会话 / 线**钉死到同一版本实例**（sticky version），保证一条逻辑链读写契约一致，**不在灰度窗口跨版本自相矛盾**。",
+"interfaces": {
+"cli": "utos tool version-affinity-router execute --input <input.json>",
+"mcp": "tool.a.version-affinity-router",
+"api": "POST /utos/tools/version-affinity-router"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/version-affinity-router"
+},
+{
+"name": "version-pinned-routing",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "A 平台编排 / J 基础设施交叉 · 挡 D4「换版抢调用」缺陷 · 与 K1 共用 drain · status=planned",
+"interfaces": {
+"cli": "utos tool version-pinned-routing execute --input <input.json>",
+"mcp": "tool.a.version-pinned-routing",
+"api": "POST /utos/tools/version-pinned-routing"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/version-pinned-routing"
+},
+{
+"name": "vuln-fractal-decompose-vuln-fractal-decompose",
+"category": "A_platform_orchestration",
+"category_zh": "平台编排",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案：分形 BOM 深拆引擎 `vuln-fractal-decompose`",
+"interfaces": {
+"cli": "utos tool vuln-fractal-decompose-vuln-fractal-decompose execute --input <input.json>",
+"mcp": "tool.a.vuln-fractal-decompose-vuln-fractal-decompose",
+"api": "POST /utos/tools/vuln-fractal-decompose-vuln-fractal-decompose"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/A_platform_orchestration/vuln-fractal-decompose-vuln-fractal-decompose"
+},
+{
+"name": "admission-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "资源准入闸：检查内存、worker、Max号、连接池、磁盘等运行前置条件。",
+"interfaces": {
+"cli": "utos tool admission-gate check --input <input.json>",
+"mcp": "tool.b.admission-gate",
+"api": "POST /utos/tools/admission-gate"
+},
+"deps": [
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/admission-gate"
+},
+{
+"name": "admission-serializer",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "把**四入口并发申请漏斗成一条串行许可流**，对同一受保护资源的「读-改-写（RMW）」操作强制单飞 + 有序，从根上消灭「丢更新 / 后写覆盖前写 / 并发重复执行」。",
+"interfaces": {
+"cli": "utos tool admission-serializer execute --input <input.json>",
+"mcp": "tool.b.admission-serializer",
+"api": "POST /utos/tools/admission-serializer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/admission-serializer"
+},
+{
+"name": "admission-state-arbiter",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "工具深拆 + OSS集成方案 · admission-state-arbiter（统一准入态仲裁器）· extra-109",
+"interfaces": {
+"cli": "utos tool admission-state-arbiter execute --input <input.json>",
+"mcp": "tool.b.admission-state-arbiter",
+"api": "POST /utos/tools/admission-state-arbiter"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/admission-state-arbiter"
+},
+{
+"name": "artifact-completeness-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "这是消费前的\"过磅+验封\"工序**——不靠\"文件在不在\"，靠\"清单逐项过磅(齐)、封口完好(非半截)、封条没换(sha稳)\"，缺一即拒，截图比对走哈希不走肉眼。直接挡 **D10/D9 extra-73**：半截/占位/漂移产物冒充成品收口。",
+"interfaces": {
+"cli": "utos tool artifact-completeness-gate execute --input <input.json>",
+"mcp": "tool.b.artifact-completeness-gate",
+"api": "POST /utos/tools/artifact-completeness-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/artifact-completeness-gate"
+},
+{
+"name": "artifact-contract-validator",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "产物合同校验器：校验 NoCodeFlow、CodeFlow、DevFilePack、TaskGraph、EvidenceLedger 的 schema 与完整性。",
+"interfaces": {
+"cli": "utos tool artifact-contract-validator validate --input <input.json>",
+"mcp": "tool.b.artifact-contract-validator",
+"api": "POST /utos/tools/artifact-contract-validator"
+},
+"deps": [
+"json-convert",
+"charter-check",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/artifact-contract-validator"
+},
+{
+"name": "backpressure-load-shedder",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · extra-81 背压负载脱落器（backpressure-load-shedder）",
+"interfaces": {
+"cli": "utos tool backpressure-load-shedder execute --input <input.json>",
+"mcp": "tool.b.backpressure-load-shedder",
+"api": "POST /utos/tools/backpressure-load-shedder"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/backpressure-load-shedder"
+},
+{
+"name": "breaking-change-compat-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 · OSS 集成方案",
+"interfaces": {
+"cli": "utos tool breaking-change-compat-gate execute --input <input.json>",
+"mcp": "tool.b.breaking-change-compat-gate",
+"api": "POST /utos/tools/breaking-change-compat-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/breaking-change-compat-gate"
+},
+{
+"name": "cache-invalidation-bus",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深挖 · OSS 集成方案 · extra-108",
+"interfaces": {
+"cli": "utos tool cache-invalidation-bus execute --input <input.json>",
+"mcp": "tool.b.cache-invalidation-bus",
+"api": "POST /utos/tools/cache-invalidation-bus"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/cache-invalidation-bus"
+},
+{
+"name": "canvas-issue-collector",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 · OSS 集成方案",
+"interfaces": {
+"cli": "utos tool canvas-issue-collector execute --input <input.json>",
+"mcp": "tool.b.canvas-issue-collector",
+"api": "POST /utos/tools/canvas-issue-collector"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/canvas-issue-collector"
+},
+{
+"name": "capability-token-vault",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "extra-98 · capability-token-vault（能力令牌保管库 / token 生命周期与吊销）OSS 集成方案",
+"interfaces": {
+"cli": "utos tool capability-token-vault execute --input <input.json>",
+"mcp": "tool.b.capability-token-vault",
+"api": "POST /utos/tools/capability-token-vault"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/capability-token-vault"
+},
+{
+"name": "charter-check",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "章程/规范校验闸：校验工具宪法、项目章程、流程合同和禁区规则是否被违反。",
+"interfaces": {
+"cli": "utos tool charter-check check --input <input.json>",
+"mcp": "tool.b.charter-check",
+"api": "POST /utos/tools/charter-check"
+},
+"deps": [
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/charter-check"
+},
+{
+"name": "circuit-breaker-broker",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "为每条 `caller→H` 依赖边维护**共享** circuit 状态(closed / open / half-open);失败率超阈即 OPEN 快速失败;把分散在多代理/多线/多模型的失败信号**聚合成集体止损决策**。",
+"interfaces": {
+"cli": "utos tool circuit-breaker-broker execute --input <input.json>",
+"mcp": "tool.b.circuit-breaker-broker",
+"api": "POST /utos/tools/circuit-breaker-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/circuit-breaker-broker"
+},
+{
+"name": "clock-skew-monitor",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "监测「锁服务时钟」与「锁持有者时钟」之间的漂移，把测得的安全裕度算进 lease 判定，根治深挖逼出的 unknown「lease 到底基于谁的时钟」(extra-59)。",
+"interfaces": {
+"cli": "utos tool clock-skew-monitor execute --input <input.json>",
+"mcp": "tool.b.clock-skew-monitor",
+"api": "POST /utos/tools/clock-skew-monitor"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/clock-skew-monitor"
+},
+{
+"name": "concurrency-admission-broker",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "全局唯一的串行准入入口**——任何工序/小队/代理要占用受限资源（fleet 槽位 / 内存预算 / 终端 / 沙盒 / 模型并发）前，都必须先经此处做**原子 check-and-reserve**；满则**入队**（FIFO + 优先级），**绝不硬上**。",
+"interfaces": {
+"cli": "utos tool concurrency-admission-broker execute --input <input.json>",
+"mcp": "tool.b.concurrency-admission-broker",
+"api": "POST /utos/tools/concurrency-admission-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/concurrency-admission-broker"
+},
+{
+"name": "concurrency-admission-tool",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "并发准入原子预留（reserve-then-run）**——把\"已放行未实占\"的分支计入内存/槽位预算账本，杜绝 TOCTOU 超顶，挡掉 D4 extra-72。",
+"interfaces": {
+"cli": "utos tool concurrency-admission-tool execute --input <input.json>",
+"mcp": "tool.b.concurrency-admission-tool",
+"api": "POST /utos/tools/concurrency-admission-tool"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/concurrency-admission-tool"
+},
+{
+"name": "concurrency-contract-linter",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "并发契约 linter。扫每个工具 manifest 是否声明 `{fan_out / fan_in / quorum / idempotency_key / owned_shared_resources}`；**未声明并发语义 → 不予入库**。补宪法 §3 源头预防的缺口（extra-76，深挖逼出）。",
+"interfaces": {
+"cli": "utos tool concurrency-contract-linter execute --input <input.json>",
+"mcp": "tool.b.concurrency-contract-linter",
+"api": "POST /utos/tools/concurrency-contract-linter"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/concurrency-contract-linter"
+},
+{
+"name": "concurrent-deploy-replay",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深挖方案 · extra-12 `concurrent-deploy-replay`",
+"interfaces": {
+"cli": "utos tool concurrent-deploy-replay execute --input <input.json>",
+"mcp": "tool.b.concurrent-deploy-replay",
+"api": "POST /utos/tools/concurrent-deploy-replay"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/concurrent-deploy-replay"
+},
+{
+"name": "config-drift-freeze-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · OSS 集成方案 · `config-drift-freeze-gate`（extra-142）",
+"interfaces": {
+"cli": "utos tool config-drift-freeze-gate execute --input <input.json>",
+"mcp": "tool.b.config-drift-freeze-gate",
+"api": "POST /utos/tools/config-drift-freeze-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/config-drift-freeze-gate"
+},
+{
+"name": "conflict-drift-detector",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "在\"一切皆工具 + 画布编排 + 多模型多代理小队\"架构下，**实时探测两类编排元层缺陷——(a) 两个 run/worker 并发写同一 `owned_path`（写写冲突）；(b) 工具注册表 `tool_registry` 的声明态 vs 实际态漂移（注册漂移）**，先红后绿、故障隔离、三接口同契约。",
+"interfaces": {
+"cli": "utos tool conflict-drift-detector execute --input <input.json>",
+"mcp": "tool.b.conflict-drift-detector",
+"api": "POST /utos/tools/conflict-drift-detector"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/conflict-drift-detector"
+},
+{
+"name": "contract-version-guard",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解：契约版本兼容闸 `contract-version-guard`",
+"interfaces": {
+"cli": "utos tool contract-version-guard execute --input <input.json>",
+"mcp": "tool.b.contract-version-guard",
+"api": "POST /utos/tools/contract-version-guard"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/contract-version-guard"
+},
+{
+"name": "control-rearm-coordinator",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具集众长 OSS 集成方案 · extra-137",
+"interfaces": {
+"cli": "utos tool control-rearm-coordinator execute --input <input.json>",
+"mcp": "tool.b.control-rearm-coordinator",
+"api": "POST /utos/tools/control-rearm-coordinator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/control-rearm-coordinator"
+},
+{
+"name": "crisis-handler",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "危机处理器：根据 WD 阈值和十类危机模板执行降级、熔断、回滚与通知。",
+"interfaces": {
+"cli": "utos tool crisis-handler execute --input <input.json>",
+"mcp": "tool.b.crisis-handler",
+"api": "POST /utos/tools/crisis-handler"
+},
+"deps": [
+"watchdog",
+"alert-notify"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/crisis-handler"
+},
+{
+"name": "cross-tenant-isolation-checker",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "extra-140 — cross-tenant-isolation-checker 升一阶（投递→消费+物化双闸）OSS 集成方案",
+"interfaces": {
+"cli": "utos tool cross-tenant-isolation-checker execute --input <input.json>",
+"mcp": "tool.b.cross-tenant-isolation-checker",
+"api": "POST /utos/tools/cross-tenant-isolation-checker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/cross-tenant-isolation-checker"
+},
+{
+"name": "decision-point-recorder",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "extra-133 · decision-point-recorder（决策点取证器）— OSS 集众长方案",
+"interfaces": {
+"cli": "utos tool decision-point-recorder execute --input <input.json>",
+"mcp": "tool.b.decision-point-recorder",
+"api": "POST /utos/tools/decision-point-recorder"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/decision-point-recorder"
+},
+{
+"name": "delegation-token-mint",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案：`delegation-token-mint`（extra-93）",
+"interfaces": {
+"cli": "utos tool delegation-token-mint execute --input <input.json>",
+"mcp": "tool.b.delegation-token-mint",
+"api": "POST /utos/tools/delegation-token-mint"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/delegation-token-mint"
+},
+{
+"name": "dependency-chaos-injector",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深挖方案 · extra-86 · dependency-chaos-injector（依赖混沌注入器 / 雪崩复现床）",
+"interfaces": {
+"cli": "utos tool dependency-chaos-injector execute --input <input.json>",
+"mcp": "tool.b.dependency-chaos-injector",
+"api": "POST /utos/tools/dependency-chaos-injector"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/dependency-chaos-injector"
+},
+{
+"name": "dependency-timeout-deadline-guard",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "Go context 给「deadline 沿链传播」骨架，resilience4j-TimeLimiter 给「到点真取消 future」，failsafe-go 给「policy 执行顺序」，opossum 给「timeout 事件喂画布」，coreutils timeout 思路给「沙盒墙钟杀进程组」，resilient-llm 给「per-model 超时即降级路由」，Temporal 给「schedule-to-close/h",
+"interfaces": {
+"cli": "utos tool dependency-timeout-deadline-guard execute --input <input.json>",
+"mcp": "tool.b.dependency-timeout-deadline-guard",
+"api": "POST /utos/tools/dependency-timeout-deadline-guard"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/dependency-timeout-deadline-guard"
+},
+{
+"name": "evidence-contract-enforcer",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "把宪法 §3.5「可追溯」从软约定变硬闸——每个工具调用在 **入口 / 出口 / 决策点** 三处必须落标准证据字段（`trace_id` / `causation_id` / `tool_version_hash` / `lease_id` / `saga_id` / `idem_key`），缺字段即 **拒入网格（reject-to-mesh）**。",
+"interfaces": {
+"cli": "utos tool evidence-contract-enforcer execute --input <input.json>",
+"mcp": "tool.b.evidence-contract-enforcer",
+"api": "POST /utos/tools/evidence-contract-enforcer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/evidence-contract-enforcer"
+},
+{
+"name": "fencing-token-broker-extra-54",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具集众长方案 · extra-54 · fencing-token-broker",
+"interfaces": {
+"cli": "utos tool fencing-token-broker-extra-54 execute --input <input.json>",
+"mcp": "tool.b.fencing-token-broker-extra-54",
+"api": "POST /utos/tools/fencing-token-broker-extra-54"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/fencing-token-broker-extra-54"
+},
+{
+"name": "flow-graph-comparator",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "图对图验收器：NoCodeFlow VS CodeFlow，对比漏做、多做、条件不一致、权限不一致。",
+"interfaces": {
+"cli": "utos tool flow-graph-comparator compare --input <input.json>",
+"mcp": "tool.b.flow-graph-comparator",
+"api": "POST /utos/tools/flow-graph-comparator"
+},
+"deps": [
+"nocode-flow-freezer",
+"code-flow-scanner",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/flow-graph-comparator"
+},
+{
+"name": "half-open-recovery-prober",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具集成方案 · extra-82",
+"interfaces": {
+"cli": "utos tool half-open-recovery-prober execute --input <input.json>",
+"mcp": "tool.b.half-open-recovery-prober",
+"api": "POST /utos/tools/half-open-recovery-prober"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/half-open-recovery-prober"
+},
+{
+"name": "identity-aware-blast-graph",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "在 UTOS **工具依赖图**之上叠加一层 `principal/role → 经边 → 可达工具` 的**身份可达层**，让影响分析能回答\"谁（哪个 principal/role）能（合法或越权）走到哪个工具\"。",
+"interfaces": {
+"cli": "utos tool identity-aware-blast-graph execute --input <input.json>",
+"mcp": "tool.b.identity-aware-blast-graph",
+"api": "POST /utos/tools/identity-aware-blast-graph"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/identity-aware-blast-graph"
+},
+{
+"name": "identity-propagation-broker",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "用 biscuit 的\"只能收紧\"结构 + SPIFFE 的\"身份被签发\" + RFC8693 的\"委托链字段\" + OPA 的\"政策交集与审计\"，拼成一个所有跨工具调用都必须穿过的、逐跳只会变窄的身份脊梁。",
+"interfaces": {
+"cli": "utos tool identity-propagation-broker execute --input <input.json>",
+"mcp": "tool.b.identity-propagation-broker",
+"api": "POST /utos/tools/identity-propagation-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/identity-propagation-broker"
+},
+{
+"name": "ignition-ledger",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "★K-Ignition-Ledger 触发幂等账本工具 (extra-87) — 集众长 OSS 集成方案",
+"interfaces": {
+"cli": "utos tool ignition-ledger execute --input <input.json>",
+"mcp": "tool.b.ignition-ledger",
+"api": "POST /utos/tools/ignition-ledger"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/ignition-ledger"
+},
+{
+"name": "in-flight",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案 · extra-3",
+"interfaces": {
+"cli": "utos tool in-flight execute --input <input.json>",
+"mcp": "tool.b.in-flight",
+"api": "POST /utos/tools/in-flight"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/in-flight"
+},
+{
+"name": "in-flight-run-accountant",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "已到顶的 run 信实测;没到顶的 run 信\"实测+剩余爬坡\"里的较大者,宁可高估占用、绝不低估,从源头掐死\"派多了才发现\"。** 这是 §0 病根的直接对治。",
+"interfaces": {
+"cli": "utos tool in-flight-run-accountant execute --input <input.json>",
+"mcp": "tool.b.in-flight-run-accountant",
+"api": "POST /utos/tools/in-flight-run-accountant"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/in-flight-run-accountant"
+},
+{
+"name": "interleaving-replayer",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "本场最核心缺失工具**。现有「影子验证（shadow-verify）/ 沙盒隔离（sandbox-iso）」只跑单流、无交错注入 → 任何「leader 续约失败 + 并发任务 BLOCK + 时钟漂移」三者同时成立才暴露的 bug，单流验证永远抓不到。",
+"interfaces": {
+"cli": "utos tool interleaving-replayer execute --input <input.json>",
+"mcp": "tool.b.interleaving-replayer",
+"api": "POST /utos/tools/interleaving-replayer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/interleaving-replayer"
+},
+{
+"name": "lease-revalidate-guard",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具集众长 OSS 集成方案 · extra-55",
+"interfaces": {
+"cli": "utos tool lease-revalidate-guard execute --input <input.json>",
+"mcp": "tool.b.lease-revalidate-guard",
+"api": "POST /utos/tools/lease-revalidate-guard"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/lease-revalidate-guard"
+},
+{
+"name": "load-shedder",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具集众长方案 · extra-46 `load-shedder`(B 验证治理)",
+"interfaces": {
+"cli": "utos tool load-shedder execute --input <input.json>",
+"mcp": "tool.b.load-shedder",
+"api": "POST /utos/tools/load-shedder"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/load-shedder"
+},
+{
+"name": "lock-holder-liveness-probe",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "让看门狗在重派前先回答一个问题——**持有者是\"卡住还活着、还握着锁\"，还是\"已经失锁/会话过期、脏状态残留\"？** 前者重派=雪崩放大，后者才该接管。现有看门狗是无状态探活脚本（只看 issue 是否 done / evidence 是否 stale），它本身就是雪崩放大器（见 MEMORY「看门狗自燃死循环」「派发去重」）。",
+"interfaces": {
+"cli": "utos tool lock-holder-liveness-probe execute --input <input.json>",
+"mcp": "tool.b.lock-holder-liveness-probe",
+"api": "POST /utos/tools/lock-holder-liveness-probe"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/lock-holder-liveness-probe"
+},
+{
+"name": "masking-policy-resolver",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "PDP 单点裁决(Cedar 核 + Ranger 级别 + AuthZEN 契约),决策被 egress-gate 与 saga-replayer **同一接口复用**,Casbin 式外置策略表可热更,Cerbos 式留痕做对照证据。这正契合苏总四要素:**画布编排**(工具入 registry 可拖)+**小队逻辑**(多代理走同契约)+**多模型多代理**(三接口 + 多语言 SDK)+**一切皆工具**(独立可插拔)。",
+"interfaces": {
+"cli": "utos tool masking-policy-resolver execute --input <input.json>",
+"mcp": "tool.b.masking-policy-resolver",
+"api": "POST /utos/tools/masking-policy-resolver"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/masking-policy-resolver"
+},
+{
+"name": "memory-reservation-ledger",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "批准即\"事前扣账\"占住内存预算，进程真退出才\"释放\"，谁也别想绕过\"文件存在/估算\"瞎扣 —— 预算的唯一真值源（SSOT）。",
+"interfaces": {
+"cli": "utos tool memory-reservation-ledger execute --input <input.json>",
+"mcp": "tool.b.memory-reservation-ledger",
+"api": "POST /utos/tools/memory-reservation-ledger"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/memory-reservation-ledger"
+},
+{
+"name": "nocode-flow-freezer",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "无代码流程图冻结闸：把 IntentGraph 冻结为开发合同，禁止无证据漂移。",
+"interfaces": {
+"cli": "utos tool nocode-flow-freezer freeze --input <input.json>",
+"mcp": "tool.b.nocode-flow-freezer",
+"api": "POST /utos/tools/nocode-flow-freezer"
+},
+"deps": [
+"nocode-flow-generator",
+"charter-check",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/nocode-flow-freezer"
+},
+{
+"name": "owned-path-lease",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "OSS 集成方案 · 工具 extra-4",
+"interfaces": {
+"cli": "utos tool owned-path-lease execute --input <input.json>",
+"mcp": "tool.b.owned-path-lease",
+"api": "POST /utos/tools/owned-path-lease"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/owned-path-lease"
+},
+{
+"name": "owned-path-lock-manager",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "Redis 当快闸、PG/etcd 当权威账、etcd revision 当防伪戳、Curator 当排队自愈范式、PG 死锁器+NetworkX 当断环器**——拼成 UTOS 专属的 path 级互斥+死锁断环工具。",
+"interfaces": {
+"cli": "utos tool owned-path-lock-manager execute --input <input.json>",
+"mcp": "tool.b.owned-path-lock-manager",
+"api": "POST /utos/tools/owned-path-lock-manager"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/owned-path-lock-manager"
+},
+{
+"name": "permission-drift-sentinel",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "OPA 当脑、OPAL 当神经、c7n 当基线记忆、Conftest 当闸门、FlareCanary 当运行时眼睛、OWASP+semver 当通用语言**，自研只补 scope 偏序薄层和三接口契约壳——绝不手搓决策引擎。",
+"interfaces": {
+"cli": "utos tool permission-drift-sentinel execute --input <input.json>",
+"mcp": "tool.b.permission-drift-sentinel",
+"api": "POST /utos/tools/permission-drift-sentinel"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/permission-drift-sentinel"
+},
+{
+"name": "pipeline-constraint-verifier",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "Φ_done 验证 + 测谎：验证模型/Agent 声称完成是否有证据支撑。",
+"interfaces": {
+"cli": "utos tool pipeline-constraint-verifier verify --input <input.json>",
+"mcp": "tool.b.pipeline-constraint-verifier",
+"api": "POST /utos/tools/pipeline-constraint-verifier"
+},
+"deps": [
+"evidence-ledger",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/pipeline-constraint-verifier"
+},
+{
+"name": "rbac-auth",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "RBAC 鉴权：用户、模型、Agent、小队、工具调用权限与审计。",
+"interfaces": {
+"cli": "utos tool rbac-auth execute --input <input.json>",
+"mcp": "tool.b.rbac-auth",
+"api": "POST /utos/tools/rbac-auth"
+},
+"deps": [
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/rbac-auth"
+},
+{
+"name": "retry-budget-backoff-governor",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具集众长方案 · extra-80",
+"interfaces": {
+"cli": "utos tool retry-budget-backoff-governor execute --input <input.json>",
+"mcp": "tool.b.retry-budget-backoff-governor",
+"api": "POST /utos/tools/retry-budget-backoff-governor"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/retry-budget-backoff-governor"
+},
+{
+"name": "runtime-boundary-reconciler",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "extra-141 · runtime-boundary-reconciler 运行时边界对账器",
+"interfaces": {
+"cli": "utos tool runtime-boundary-reconciler execute --input <input.json>",
+"mcp": "tool.b.runtime-boundary-reconciler",
+"api": "POST /utos/tools/runtime-boundary-reconciler"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/runtime-boundary-reconciler"
+},
+{
+"name": "runtime-truth-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "registry 是写时快照，被 18 算子/61 工具当成读时真值。本工具在 SELECT 与现实之间插一道实时握手闸，把\"过去写的\"降级为缓存，把\"现在测的\"升格为真值。",
+"interfaces": {
+"cli": "utos tool runtime-truth-gate execute --input <input.json>",
+"mcp": "tool.b.runtime-truth-gate",
+"api": "POST /utos/tools/runtime-truth-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/runtime-truth-gate"
+},
+{
+"name": "shadow-parity-checker",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "断言「影子运行时边界 == 生产运行时边界」，且三接口（API/MCP/CLI）的 **effective 边界**三者一致；不等价则**拒绝**用「影子绿 / 单接口绿」背书部署，挡 **DM6 静默成功错部署**。",
+"interfaces": {
+"cli": "utos tool shadow-parity-checker execute --input <input.json>",
+"mcp": "tool.b.shadow-parity-checker",
+"api": "POST /utos/tools/shadow-parity-checker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/shadow-parity-checker"
+},
+{
+"name": "shadow-validator",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "影子验证：在不影响主线的情况下复核模型输出、代码变更和验收结果。",
+"interfaces": {
+"cli": "utos tool shadow-validator validate --input <input.json>",
+"mcp": "tool.b.shadow-validator",
+"api": "POST /utos/tools/shadow-validator"
+},
+"deps": [
+"pipeline-constraint-verifier"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/shadow-validator"
+},
+{
+"name": "shared-resource-detector",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 · extra-9",
+"interfaces": {
+"cli": "utos tool shared-resource-detector execute --input <input.json>",
+"mcp": "tool.b.shared-resource-detector",
+"api": "POST /utos/tools/shared-resource-detector"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/shared-resource-detector"
+},
+{
+"name": "squad-signoff-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "生产线小队签收闸：写码、审计、截图、VM、PR、主管签收必须绑定证据。",
+"interfaces": {
+"cli": "utos tool squad-signoff-gate signoff --input <input.json>",
+"mcp": "tool.b.squad-signoff-gate",
+"api": "POST /utos/tools/squad-signoff-gate"
+},
+"deps": [
+"evidence-matrix-builder",
+"rbac-auth",
+"charter-check"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/squad-signoff-gate"
+},
+{
+"name": "stable-dedupkey",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "★K-Stable-DedupKey 稳定去重键工具 — OSS 集众长方案（extra-89）",
+"interfaces": {
+"cli": "utos tool stable-dedupkey execute --input <input.json>",
+"mcp": "tool.b.stable-dedupkey",
+"api": "POST /utos/tools/stable-dedupkey"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/stable-dedupkey"
+},
+{
+"name": "state-machine-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "项目状态机闸：Intake→Prototype→Frozen→Dispatch→Patch→Compare→Verify→Signoff，不准跳步。",
+"interfaces": {
+"cli": "utos tool state-machine-gate check --input <input.json>",
+"mcp": "tool.b.state-machine-gate",
+"api": "POST /utos/tools/state-machine-gate"
+},
+"deps": [
+"charter-check",
+"event-bus",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/state-machine-gate"
+},
+{
+"name": "state-transition-fence-broker",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "extra-136 · state-transition-fence-broker（状态迁移栅栏代理）",
+"interfaces": {
+"cli": "utos tool state-transition-fence-broker execute --input <input.json>",
+"mcp": "tool.b.state-transition-fence-broker",
+"api": "POST /utos/tools/state-transition-fence-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/state-transition-fence-broker"
+},
+{
+"name": "tenant-isolation-guard",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · OSS 集众长方案：tenant-isolation-guard（extra-94）",
+"interfaces": {
+"cli": "utos tool tenant-isolation-guard execute --input <input.json>",
+"mcp": "tool.b.tenant-isolation-guard",
+"api": "POST /utos/tools/tenant-isolation-guard"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tenant-isolation-guard"
+},
+{
+"name": "terminal-absorption-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "终态吸收硬闸：防止未完成、假完成、循环输出进入终态。",
+"interfaces": {
+"cli": "utos tool terminal-absorption-gate check --input <input.json>",
+"mcp": "tool.b.terminal-absorption-gate",
+"api": "POST /utos/tools/terminal-absorption-gate"
+},
+"deps": [
+"pipeline-constraint-verifier"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/terminal-absorption-gate"
+},
+{
+"name": "terminal-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "★K-Terminal-Gate · Terminal 生命周期不变量闸工具(extra-88) — 集众长 OSS 集成方案",
+"interfaces": {
+"cli": "utos tool terminal-gate execute --input <input.json>",
+"mcp": "tool.b.terminal-gate",
+"api": "POST /utos/tools/terminal-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/terminal-gate"
+},
+{
+"name": "terminal-read-barrier",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "B 验证治理类（与\"看门狗\"\"终态吸收闸\"并列，是它们的**读侧前置门**）。",
+"interfaces": {
+"cli": "utos tool terminal-read-barrier execute --input <input.json>",
+"mcp": "tool.b.terminal-read-barrier",
+"api": "POST /utos/tools/terminal-read-barrier"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/terminal-read-barrier"
+},
+{
+"name": "tool-call-identity-propagator",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深挖方案 · extra-114",
+"interfaces": {
+"cli": "utos tool tool-call-identity-propagator execute --input <input.json>",
+"mcp": "tool.b.tool-call-identity-propagator",
+"api": "POST /utos/tools/tool-call-identity-propagator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-call-identity-propagator"
+},
+{
+"name": "tool-circuit-breaker",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "resilience4j 给\"组合装饰器+慢调用双触发\"骨架，gobreaker 给\"策略即回调\"，opossum 给\"fallback+事件喂画布\"，pybreaker 给\"Redis 跨箱共享状态\"，failsafe-go 给\"policy 执行顺序\"，resilient-llm 给\"按模型降级路由\"。",
+"interfaces": {
+"cli": "utos tool tool-circuit-breaker execute --input <input.json>",
+"mcp": "tool.b.tool-circuit-breaker",
+"api": "POST /utos/tools/tool-circuit-breaker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-circuit-breaker"
+},
+{
+"name": "tool-control-baseline-guard",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "功能契约管\"接口长啥样\"，控制基线管\"它被谁、以多大权限、在什么闸值下跑\"。换版时后者偷偷放宽，是最隐蔽的提权/越权事故源。",
+"interfaces": {
+"cli": "utos tool tool-control-baseline-guard execute --input <input.json>",
+"mcp": "tool.b.tool-control-baseline-guard",
+"api": "POST /utos/tools/tool-control-baseline-guard"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-control-baseline-guard"
+},
+{
+"name": "tool-decoupler",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深拆方案 · 工具拆离器 `tool-decoupler`",
+"interfaces": {
+"cli": "utos tool tool-decoupler execute --input <input.json>",
+"mcp": "tool.b.tool-decoupler",
+"api": "POST /utos/tools/tool-decoupler"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-decoupler"
+},
+{
+"name": "tool-defect",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "写可见性栅栏**。产物在 `fsync ∧ 跨卷可读` 之前，**不允许**任何状态翻 `done`。",
+"interfaces": {
+"cli": "utos tool tool-defect execute --input <input.json>",
+"mcp": "tool.b.tool-defect",
+"api": "POST /utos/tools/tool-defect"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-defect"
+},
+{
+"name": "tool-delete-2pc-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "删除 = prepare(全局拒新 + 登记 inflight + 广播失效预告) → 等 K2 计数归零或超时 → commit(真删 registry/schema/句柄) 或 abort(回滚)。挡 D5，统领 K1~K5。",
+"interfaces": {
+"cli": "utos tool tool-delete-2pc-gate execute --input <input.json>",
+"mcp": "tool.b.tool-delete-2pc-gate",
+"api": "POST /utos/tools/tool-delete-2pc-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-delete-2pc-gate"
+},
+{
+"name": "tool-idempotency",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · 集众长 OSS 集成方案",
+"interfaces": {
+"cli": "utos tool tool-idempotency execute --input <input.json>",
+"mcp": "tool.b.tool-idempotency",
+"api": "POST /utos/tools/tool-idempotency"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-idempotency"
+},
+{
+"name": "tool-inflight-refcounter",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "每工具维护「已 routed 未 landing」的 **inflight 引用计数** + 每次调用打 **epoch**；续派/重投按 **资源级 epoch** 去重，而非只按 task_id。",
+"interfaces": {
+"cli": "utos tool tool-inflight-refcounter execute --input <input.json>",
+"mcp": "tool.b.tool-inflight-refcounter",
+"api": "POST /utos/tools/tool-inflight-refcounter"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-inflight-refcounter"
+},
+{
+"name": "tool-lifecycle-fsm-gate",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "把工具的 `enabled` 布尔升级成 **enabled → draining → disabled → deleted** 状态机；任何 delete/disable/upgrade 必经 **draining**（拒新 + 排旧 + 超时兜底），**引用计数归零**才真删 / 真 DROP。",
+"interfaces": {
+"cli": "utos tool tool-lifecycle-fsm-gate execute --input <input.json>",
+"mcp": "tool.b.tool-lifecycle-fsm-gate",
+"api": "POST /utos/tools/tool-lifecycle-fsm-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-lifecycle-fsm-gate"
+},
+{
+"name": "tool-policy-engine",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "工具策略引擎：统一执行 RBAC、资源准入、可见性、出域脱敏、租户隔离策略。",
+"interfaces": {
+"cli": "utos tool tool-policy-engine execute --input <input.json>",
+"mcp": "tool.b.tool-policy-engine",
+"api": "POST /utos/tools/tool-policy-engine"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/B_validation_governance/tool-policy-engine"
+},
+{
+"name": "tool-protocol-validator",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "工具协议校验器：校验所有调用与返回是否符合 ToolCallEnvelope 和 ToolResultEnvelope。",
+"interfaces": {
+"cli": "utos tool tool-protocol-validator execute --input <input.json>",
+"mcp": "tool.b.tool-protocol-validator",
+"api": "POST /utos/tools/tool-protocol-validator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/B_validation_governance/tool-protocol-validator"
+},
+{
+"name": "tool-quota-ledger",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "维护 `(subject, tool, action)` 三维全局配额账本；**所有路径先扣账本再放行**（pre-charge / commit-or-refund）；与 `backpressure-queue` 协作背压；补 **CG-4（全网格配额一致性缺口）**。",
+"interfaces": {
+"cli": "utos tool tool-quota-ledger execute --input <input.json>",
+"mcp": "tool.b.tool-quota-ledger",
+"api": "POST /utos/tools/tool-quota-ledger"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-quota-ledger"
+},
+{
+"name": "tool-runtime-attestation",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "为每个运行实例（worker/工具进程/sandbox）签发并校验**运行时证明**（netns / uid / 镜像摘要 / 沙盒等级），**互调前先验对端证明再放行** —— 让 interop「只经接口」从纸面契约变成**物理层可证明**，堵 G2 网络旁路 / G4 沙盒逃逸 / G7 特权越权 / G9 影子污染（extra-125）。",
+"interfaces": {
+"cli": "utos tool tool-runtime-attestation execute --input <input.json>",
+"mcp": "tool.b.tool-runtime-attestation",
+"api": "POST /utos/tools/tool-runtime-attestation"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tool-runtime-attestation"
+},
+{
+"name": "tool-validation-engine",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "工具验证引擎：执行 manifest、schema、三接口一致性、沙盒、证据链、依赖、画布兼容验证。",
+"interfaces": {
+"cli": "utos tool tool-validation-engine execute --input <input.json>",
+"mcp": "tool.b.tool-validation-engine",
+"api": "POST /utos/tools/tool-validation-engine"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/B_validation_governance/tool-validation-engine"
+},
+{
+"name": "transitive-impact-analyzer",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深挖方案 · extra-129",
+"interfaces": {
+"cli": "utos tool transitive-impact-analyzer execute --input <input.json>",
+"mcp": "tool.b.transitive-impact-analyzer",
+"api": "POST /utos/tools/transitive-impact-analyzer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/transitive-impact-analyzer"
+},
+{
+"name": "tri-interface-contract-linter",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 · OSS 集众长方案",
+"interfaces": {
+"cli": "utos tool tri-interface-contract-linter execute --input <input.json>",
+"mcp": "tool.b.tri-interface-contract-linter",
+"api": "POST /utos/tools/tri-interface-contract-linter"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/tri-interface-contract-linter"
+},
+{
+"name": "watchdog",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "看门狗：弱权安全网，监测任务卡死、循环、资源异常，并触发收敛型处理。",
+"interfaces": {
+"cli": "utos tool watchdog execute --input <input.json>",
+"mcp": "tool.b.watchdog",
+"api": "POST /utos/tools/watchdog"
+},
+"deps": [
+"trace-causal",
+"alert-notify"
+],
+"status": "built",
+"module_path": "tools/B_validation_governance/watchdog"
+},
+{
+"name": "watchdog-admission-coupling",
+"category": "B_validation_governance",
+"category_zh": "验证治理",
+"version": "0.1.0",
+"description": "续派必经准入闸；满则记账不续；切断\"看门狗→续派→更满→更续派\"的自燃正反馈环。",
+"interfaces": {
+"cli": "utos tool watchdog-admission-coupling execute --input <input.json>",
+"mcp": "tool.b.watchdog-admission-coupling",
+"api": "POST /utos/tools/watchdog-admission-coupling"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/B_validation_governance/watchdog-admission-coupling"
+},
+{
+"name": "alert-notify",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "告警/通知：异常、阻塞、验收失败、关键事件主动通知苏总和对应小队。",
+"interfaces": {
+"cli": "utos tool alert-notify execute --input <input.json>",
+"mcp": "tool.c.alert-notify",
+"api": "POST /utos/tools/alert-notify"
+},
+"deps": [
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/C_trace_observability/alert-notify"
+},
+{
+"name": "callchain-tracing-agent",
+"category": "C_trace_observability",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "从入口、函数、路由或需求节点出发追踪调用链，生成可验证的调用路径和证据。",
+"interfaces": {
+"cli": "utos tool callchain-tracing-agent <action> --payload ./input.json",
+"mcp": "tool.C_trace_observability.callchain-tracing-agent",
+"api": "POST /utos/tools/callchain-tracing-agent"
+},
+"deps": [
+"flowmap-mcp-server",
+"code-flow-scanner"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/callchain-tracing-agent"
+},
+{
+"name": "causal-replay-reconstructor",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具深挖 · extra-135 · causal-replay-reconstructor（因果链重建复盘器）",
+"interfaces": {
+"cli": "utos tool causal-replay-reconstructor execute --input <input.json>",
+"mcp": "tool.c.causal-replay-reconstructor",
+"api": "POST /utos/tools/causal-replay-reconstructor"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/causal-replay-reconstructor"
+},
+{
+"name": "causation-propagator",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "在 CLI/MCP/API 三接口的调用边界，强制透传并续接 `causation_id`——调用时注入(in-band)，而非事后拼接(post-hoc reconstruct)，根治 interop-protocol / port-broker / connector 的关联断链。",
+"interfaces": {
+"cli": "utos tool causation-propagator execute --input <input.json>",
+"mcp": "tool.c.causation-propagator",
+"api": "POST /utos/tools/causation-propagator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/causation-propagator"
+},
+{
+"name": "code-flow-scanner",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "代码流程图扫描器：从代码 AST、路由、调用链、DB访问、测试 trace 生成 CodeFlow。",
+"interfaces": {
+"cli": "utos tool code-flow-scanner scan --input <input.json>",
+"mcp": "tool.c.code-flow-scanner",
+"api": "POST /utos/tools/code-flow-scanner"
+},
+"deps": [
+"trace-causal",
+"github-sync",
+"logic-diagram"
+],
+"status": "built",
+"module_path": "tools/C_trace_observability/code-flow-scanner"
+},
+{
+"name": "code-indexer",
+"category": "C_trace_observability",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "扫描仓库文件、语言、符号、路由、依赖和入口点，生成可被图谱存储的 CodeIndex。",
+"interfaces": {
+"cli": "utos tool code-indexer <action> --payload ./input.json",
+"mcp": "tool.C_trace_observability.code-indexer",
+"api": "POST /utos/tools/code-indexer"
+},
+"deps": [
+"repo-change-trigger",
+"artifact-contract-validator"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/code-indexer"
+},
+{
+"name": "config-drift-sentinel",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "持续三向比对 registry 声明态 / sandbox 测试态 / 生产生效态的「配置真值哈希」，偏离即报漂移、定位到具体工具的具体 key、可阻断 `enabled` 翻转、事件入证据链。",
+"interfaces": {
+"cli": "utos tool config-drift-sentinel execute --input <input.json>",
+"mcp": "tool.c.config-drift-sentinel",
+"api": "POST /utos/tools/config-drift-sentinel"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/config-drift-sentinel"
+},
+{
+"name": "cross-version-aggregation-fence",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案 · extra-67",
+"interfaces": {
+"cli": "utos tool cross-version-aggregation-fence execute --input <input.json>",
+"mcp": "tool.c.cross-version-aggregation-fence",
+"api": "POST /utos/tools/cross-version-aggregation-fence"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/cross-version-aggregation-fence"
+},
+{
+"name": "dashboard",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "实时仪表盘/集团健康盘：展示工具状态、生产线状态、资源、告警、验收通过率。",
+"interfaces": {
+"cli": "utos tool dashboard execute --input <input.json>",
+"mcp": "tool.c.dashboard",
+"api": "POST /utos/tools/dashboard"
+},
+"deps": [
+"trace-causal",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/C_trace_observability/dashboard"
+},
+{
+"name": "data-lineage-registry",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "类目 **C 追踪可观测**（与 全链trace/证据链 并列），补 crossGap#2（落点不可枚举）/#10（副本与磁盘失配）",
+"interfaces": {
+"cli": "utos tool data-lineage-registry execute --input <input.json>",
+"mcp": "tool.c.data-lineage-registry",
+"api": "POST /utos/tools/data-lineage-registry"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/data-lineage-registry"
+},
+{
+"name": "declare-vs-real-drift-monitor",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "周期对账 `registry 声明态` vs `进程现实态`，漂移即告警并自动降级，把不可见的并发漂移变成可观测指标。",
+"interfaces": {
+"cli": "utos tool declare-vs-real-drift-monitor execute --input <input.json>",
+"mcp": "tool.c.declare-vs-real-drift-monitor",
+"api": "POST /utos/tools/declare-vs-real-drift-monitor"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/declare-vs-real-drift-monitor"
+},
+{
+"name": "delivery-receipt-broker",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "把派发回执从 **enqueue-ack（入队即认成功）** 升级为 **process-ack（真处理完才认成功）+ 幂等键**；上游只有收到 process-ack 才认成功，否则**安全重投且不产生重复**。",
+"interfaces": {
+"cli": "utos tool delivery-receipt-broker execute --input <input.json>",
+"mcp": "tool.c.delivery-receipt-broker",
+"api": "POST /utos/tools/delivery-receipt-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/delivery-receipt-broker"
+},
+{
+"name": "dependency-truth-reconciler",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具深挖方案 · extra-126",
+"interfaces": {
+"cli": "utos tool dependency-truth-reconciler execute --input <input.json>",
+"mcp": "tool.c.dependency-truth-reconciler",
+"api": "POST /utos/tools/dependency-truth-reconciler"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/dependency-truth-reconciler"
+},
+{
+"name": "effective-config-tracer",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "effective-config-tracer · extra-121 · OSS 集众长方案",
+"interfaces": {
+"cli": "utos tool effective-config-tracer execute --input <input.json>",
+"mcp": "tool.c.effective-config-tracer",
+"api": "POST /utos/tools/effective-config-tracer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/effective-config-tracer"
+},
+{
+"name": "egress-redaction-gate",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 + OSS 集名家所长方案",
+"interfaces": {
+"cli": "utos tool egress-redaction-gate execute --input <input.json>",
+"mcp": "tool.c.egress-redaction-gate",
+"api": "POST /utos/tools/egress-redaction-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/egress-redaction-gate"
+},
+{
+"name": "enabled-lease-ttl",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "把工具的 `enabled` 从\"永久布尔\"改造成\"带 TTL 的租约（lease）\"——必须由探活（probe）周期续租才保持 `true`，租约过期则自动翻 `disabled`；专杀两种脏行：① 有人手动置 `enabled=true` 后再没人管的\"永久 true 僵尸工具\"；② worker 崩溃后把状态钉死在 `true`（crash-pinned）、看门狗据此误判\"它还活着\"导致的自燃/空转。",
+"interfaces": {
+"cli": "utos tool enabled-lease-ttl execute --input <input.json>",
+"mcp": "tool.c.enabled-lease-ttl",
+"api": "POST /utos/tools/enabled-lease-ttl"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/enabled-lease-ttl"
+},
+{
+"name": "evidence-chain-integrity-gate",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "消费前校验输入证据链无断链；断链即拒绝消费，阻断\"分形污染\"。挡 D9 extra-74。",
+"interfaces": {
+"cli": "utos tool evidence-chain-integrity-gate execute --input <input.json>",
+"mcp": "tool.c.evidence-chain-integrity-gate",
+"api": "POST /utos/tools/evidence-chain-integrity-gate"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/evidence-chain-integrity-gate"
+},
+{
+"name": "evidence-ledger",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "证据链：哈希链、防篡改、可追溯地记录文档、diff、测试、截图、日志、签收。",
+"interfaces": {
+"cli": "utos tool evidence-ledger execute --input <input.json>",
+"mcp": "tool.c.evidence-ledger",
+"api": "POST /utos/tools/evidence-ledger"
+},
+"deps": [
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/C_trace_observability/evidence-ledger"
+},
+{
+"name": "evidence-matrix-builder",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "证据矩阵构建器：把需求、任务、代码、测试、截图、日志、签收映射成覆盖矩阵。",
+"interfaces": {
+"cli": "utos tool evidence-matrix-builder build --input <input.json>",
+"mcp": "tool.c.evidence-matrix-builder",
+"api": "POST /utos/tools/evidence-matrix-builder"
+},
+"deps": [
+"evidence-ledger",
+"flow-graph-comparator",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/C_trace_observability/evidence-matrix-builder"
+},
+{
+"name": "implicit-dependency-tracer",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "extra-130 · implicit-dependency-tracer 隐式依赖追踪器",
+"interfaces": {
+"cli": "utos tool implicit-dependency-tracer execute --input <input.json>",
+"mcp": "tool.c.implicit-dependency-tracer",
+"api": "POST /utos/tools/implicit-dependency-tracer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/implicit-dependency-tracer"
+},
+{
+"name": "interleave-replay-harness",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "把一条流水线/小队执行从 `T0→Tn` 的并发交错**脚本化**，可在**指定交错点**（如 `T1.4`/`T1.8`）注入、固定调度顺序、**确定性重放**做并发回归。",
+"interfaces": {
+"cli": "utos tool interleave-replay-harness execute --input <input.json>",
+"mcp": "tool.c.interleave-replay-harness",
+"api": "POST /utos/tools/interleave-replay-harness"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/interleave-replay-harness"
+},
+{
+"name": "iteration-summary",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "迭代总结：每日/每轮自动汇总问题、修复、失败模式、改进项。",
+"interfaces": {
+"cli": "utos tool iteration-summary execute --input <input.json>",
+"mcp": "tool.c.iteration-summary",
+"api": "POST /utos/tools/iteration-summary"
+},
+"deps": [
+"trace-causal",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/C_trace_observability/iteration-summary"
+},
+{
+"name": "liveness-distinguisher",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "给看门狗喂一个 **slow vs dropped 可分辨信号**——订阅下游 `inflight` 租约与 `heartbeat` 进度心跳，把\"in_progress 且有心跳=慢，勿重投\"与\"in_progress 且心跳超时=真漏，可重投\"两态拆开，根治 **DM-3 自燃（extra-40）**。",
+"interfaces": {
+"cli": "utos tool liveness-distinguisher execute --input <input.json>",
+"mcp": "tool.c.liveness-distinguisher",
+"api": "POST /utos/tools/liveness-distinguisher"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/liveness-distinguisher"
+},
+{
+"name": "memory-pressure-circuit-breaker",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具深挖 · extra-37 · memory-pressure-circuit-breaker（内存压力熔断器）",
+"interfaces": {
+"cli": "utos tool memory-pressure-circuit-breaker execute --input <input.json>",
+"mcp": "tool.c.memory-pressure-circuit-breaker",
+"api": "POST /utos/tools/memory-pressure-circuit-breaker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/memory-pressure-circuit-breaker"
+},
+{
+"name": "patch-evidence-submitter",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "代码补丁证据提交器：提交 diff、变更说明、自测结果、关联需求和任务。",
+"interfaces": {
+"cli": "utos tool patch-evidence-submitter submit --input <input.json>",
+"mcp": "tool.c.patch-evidence-submitter",
+"api": "POST /utos/tools/patch-evidence-submitter"
+},
+"deps": [
+"github-sync",
+"evidence-ledger",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/C_trace_observability/patch-evidence-submitter"
+},
+{
+"name": "peak-rss-profiler",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案 · extra-38 `peak-rss-profiler`",
+"interfaces": {
+"cli": "utos tool peak-rss-profiler execute --input <input.json>",
+"mcp": "tool.c.peak-rss-profiler",
+"api": "POST /utos/tools/peak-rss-profiler"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/peak-rss-profiler"
+},
+{
+"name": "principal-trace-stitch",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案 · extra-97 · principal-trace-stitch（真人追溯缝合器）",
+"interfaces": {
+"cli": "utos tool principal-trace-stitch execute --input <input.json>",
+"mcp": "tool.c.principal-trace-stitch",
+"api": "POST /utos/tools/principal-trace-stitch"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/principal-trace-stitch"
+},
+{
+"name": "shared-health-view",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "把各 caller 对依赖 **H**（被调工具/模型/后端）的分散调用结果，聚合成**全局 H 健康指标**（失败率 / p99 延迟 / circuit 态 / 半开探测态），供熔断器(extra-XX breaker)、背压器(backpressure)、看门狗(watchdog) **共享只读**，解 L6「健康不可见」，并让看门狗能分辨『**等崩了的 H**』而非误杀正在恢复的 H。",
+"interfaces": {
+"cli": "utos tool shared-health-view execute --input <input.json>",
+"mcp": "tool.c.shared-health-view",
+"api": "POST /utos/tools/shared-health-view"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/shared-health-view"
+},
+{
+"name": "state-divergence-monitor",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · extra-112 · state-divergence-monitor（跨工具状态分叉哨兵）",
+"interfaces": {
+"cli": "utos tool state-divergence-monitor execute --input <input.json>",
+"mcp": "tool.c.state-divergence-monitor",
+"api": "POST /utos/tools/state-divergence-monitor"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/state-divergence-monitor"
+},
+{
+"name": "tag-provenance-binder",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具深挖方案 · extra-10 · tag-provenance-binder（tag↔commit↔task 溯源绑定器）",
+"interfaces": {
+"cli": "utos tool tag-provenance-binder execute --input <input.json>",
+"mcp": "tool.c.tag-provenance-binder",
+"api": "POST /utos/tools/tag-provenance-binder"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/tag-provenance-binder"
+},
+{
+"name": "task-followup-tracker",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "任务追踪跟进：跟踪任务状态、超时、阻塞、返工和签收。",
+"interfaces": {
+"cli": "utos tool task-followup-tracker track --input <input.json>",
+"mcp": "tool.c.task-followup-tracker",
+"api": "POST /utos/tools/task-followup-tracker"
+},
+"deps": [
+"task-board",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/C_trace_observability/task-followup-tracker"
+},
+{
+"name": "tool-blast-domain-mapper",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "UTOS 工具深挖方案 · `tool-blast-domain-mapper`（崩溃域/爆炸半径运行时映射器）",
+"interfaces": {
+"cli": "utos tool tool-blast-domain-mapper execute --input <input.json>",
+"mcp": "tool.c.tool-blast-domain-mapper",
+"api": "POST /utos/tools/tool-blast-domain-mapper"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/tool-blast-domain-mapper"
+},
+{
+"name": "tool-observability-sidecar",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "工具可观测 sidecar：采集日志、指标、trace、运行耗时、资源占用和错误证据。",
+"interfaces": {
+"cli": "utos tool tool-observability-sidecar execute --input <input.json>",
+"mcp": "tool.c.tool-observability-sidecar",
+"api": "POST /utos/tools/tool-observability-sidecar"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/C_trace_observability/tool-observability-sidecar"
+},
+{
+"name": "trace-causal",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "全链 trace/因果链/确定性 replay/取证：记录工具调用、输入输出、版本和证据。",
+"interfaces": {
+"cli": "utos tool trace-causal execute --input <input.json>",
+"mcp": "tool.c.trace-causal",
+"api": "POST /utos/tools/trace-causal"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/C_trace_observability/trace-causal"
+},
+{
+"name": "trace-correlation",
+"category": "C_trace_observability",
+"category_zh": "追踪可观测",
+"version": "0.1.0",
+"description": "跨并发工具调用串成一条 trace,让小队/多模型/多代理的每一次工具互调都能被关联、回放、定位卡点。",
+"interfaces": {
+"cli": "utos tool trace-correlation execute --input <input.json>",
+"mcp": "tool.c.trace-correlation",
+"api": "POST /utos/tools/trace-correlation"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/C_trace_observability/trace-correlation"
+},
+{
+"name": "concurrency-governance",
+"category": "K_concurrency_governance",
+"category_zh": "并发治理",
+"version": "0.1.0",
+"description": "UTOS 工具集众长 OSS 集成方案 · extra-6",
+"interfaces": {
+"cli": "utos tool concurrency-governance execute --input <input.json>",
+"mcp": "tool.k.concurrency-governance",
+"api": "POST /utos/tools/concurrency-governance"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/K_concurrency_governance/concurrency-governance"
+},
+{
+"name": "owned-path-serializer",
+"category": "K_concurrency_governance",
+"category_zh": "并发治理",
+"version": "0.1.0",
+"description": "把\"同一 `owned_path` 同时刻只允许一个有效 writer\"做成可登记的契约工具，把宪法 §1 的命名空间隔离从【工具之间】扩到【工具内部的并发写维度】。",
+"interfaces": {
+"cli": "utos tool owned-path-serializer execute --input <input.json>",
+"mcp": "tool.k.owned-path-serializer",
+"api": "POST /utos/tools/owned-path-serializer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/K_concurrency_governance/owned-path-serializer"
+},
+{
+"name": "build-cache-isolator",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · extra-11 — build-cache-isolator（构建缓存隔离器）",
+"interfaces": {
+"cli": "utos tool build-cache-isolator execute --input <input.json>",
+"mcp": "tool.j.build-cache-isolator",
+"api": "POST /utos/tools/build-cache-isolator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/build-cache-isolator"
+},
+{
+"name": "bulkhead-isolator",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "给每工具/组设**内存配额舱壁 + 熔断**。单组撞配额只熔断本组，不让内核 OOM-killer 杀整机；把工具宪法 §8「故障隔离 + 熔断」从文字变**强制隔离**；挡 DM-5（一工具 OOM 拖垮整机）/限制 DM-6（爆炸面 extra-41）。",
+"interfaces": {
+"cli": "utos tool bulkhead-isolator execute --input <input.json>",
+"mcp": "tool.j.bulkhead-isolator",
+"api": "POST /utos/tools/bulkhead-isolator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/bulkhead-isolator"
+},
+{
+"name": "bulkhead-isolator-extra-78",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "§8 写了\"要隔离\",但没有一个运行时强制物去执行\"每个依赖一个有界仓\"。extra-78 就是那个强制物。",
+"interfaces": {
+"cli": "utos tool bulkhead-isolator-extra-78 execute --input <input.json>",
+"mcp": "tool.j.bulkhead-isolator-extra-78",
+"api": "POST /utos/tools/bulkhead-isolator-extra-78"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/bulkhead-isolator-extra-78"
+},
+{
+"name": "concurrency-arena-harness",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "把本 arena 工具化为**可复现并发模拟场**——按 spec 起三路灌注器(灌注器=injector/loadgen)+注入各层交错(网络/调度/状态/时钟)+跑 ASWI 回归，给 fleet/看门狗/准入闸的并发回归做**标准靶场**；是所有 ASWI 证伪测试的**确定性基座**。",
+"interfaces": {
+"cli": "utos tool concurrency-arena-harness execute --input <input.json>",
+"mcp": "tool.j.concurrency-arena-harness",
+"api": "POST /utos/tools/concurrency-arena-harness"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/concurrency-arena-harness"
+},
+{
+"name": "config-mgmt",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "配置管理：环境变量、密钥引用、配置模板、变更审计和灰度配置。",
+"interfaces": {
+"cli": "utos tool config-mgmt execute --input <input.json>",
+"mcp": "tool.j.config-mgmt",
+"api": "POST /utos/tools/config-mgmt"
+},
+"deps": [
+"rbac-auth",
+"version-mgmt"
+],
+"status": "built",
+"module_path": "tools/J_infrastructure/config-mgmt"
+},
+{
+"name": "dependency-aware-version-cutover-coordinator",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "UTOS 工具深挖方案 · extra-145",
+"interfaces": {
+"cli": "utos tool dependency-aware-version-cutover-coordinator execute --input <input.json>",
+"mcp": "tool.j.dependency-aware-version-cutover-coordinator",
+"api": "POST /utos/tools/dependency-aware-version-cutover-coordinator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/dependency-aware-version-cutover-coordinator"
+},
+{
+"name": "dependency-cycle-breaker",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "装配/初始化期对「业务 DAG + 保护/补偿/追踪反向边」做全图环检测；成环则拒绝装配，或注入打破点(lazy-init / 接口降级)，根治 scheduler 因循环依赖死锁挂起。",
+"interfaces": {
+"cli": "utos tool dependency-cycle-breaker execute --input <input.json>",
+"mcp": "tool.j.dependency-cycle-breaker",
+"api": "POST /utos/tools/dependency-cycle-breaker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/dependency-cycle-breaker"
+},
+{
+"name": "deploy-2pc-registry",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "start 成功 + 握手通过，才令 `built` 对调度器可见；任一步失败 `built` 不生效，从根上消灭 CW1/CW2 中间态窗口。",
+"interfaces": {
+"cli": "utos tool deploy-2pc-registry execute --input <input.json>",
+"mcp": "tool.j.deploy-2pc-registry",
+"api": "POST /utos/tools/deploy-2pc-registry"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/deploy-2pc-registry"
+},
+{
+"name": "deployer",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "部署器：单一入口、flock 锁、doctor 检查、部署计划、回滚和验收。",
+"interfaces": {
+"cli": "utos tool deployer execute --input <input.json>",
+"mcp": "tool.j.deployer",
+"api": "POST /utos/tools/deployer"
+},
+"deps": [
+"version-mgmt",
+"config-mgmt",
+"sandbox-isolate"
+],
+"status": "built",
+"module_path": "tools/J_infrastructure/deployer"
+},
+{
+"name": "durable-tool-inbox",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案 · durable-tool-inbox（工具持久入站队列）",
+"interfaces": {
+"cli": "utos tool durable-tool-inbox execute --input <input.json>",
+"mcp": "tool.j.durable-tool-inbox",
+"api": "POST /utos/tools/durable-tool-inbox"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/durable-tool-inbox"
+},
+{
+"name": "emergency-reserve-cgroup",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "UTOS 工具集成方案：emergency-reserve-cgroup（急救保留槽）",
+"interfaces": {
+"cli": "utos tool emergency-reserve-cgroup execute --input <input.json>",
+"mcp": "tool.j.emergency-reserve-cgroup",
+"api": "POST /utos/tools/emergency-reserve-cgroup"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/emergency-reserve-cgroup"
+},
+{
+"name": "env-snapshot-broker",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "UTOS 工具 OSS 集成方案 · env-snapshot-broker (extra-7)",
+"interfaces": {
+"cli": "utos tool env-snapshot-broker execute --input <input.json>",
+"mcp": "tool.j.env-snapshot-broker",
+"api": "POST /utos/tools/env-snapshot-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/env-snapshot-broker"
+},
+{
+"name": "idempotency-key-store",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "UTOS 工具 extra-50 · idempotency-key-store(补偿幂等键存储)OSS 集成方案",
+"interfaces": {
+"cli": "utos tool idempotency-key-store execute --input <input.json>",
+"mcp": "tool.j.idempotency-key-store",
+"api": "POST /utos/tools/idempotency-key-store"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/idempotency-key-store"
+},
+{
+"name": "per-tool-memcap-cgroup",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "UTOS 工具集成方案 · extra-34 · per-tool-memcap-cgroup",
+"interfaces": {
+"cli": "utos tool per-tool-memcap-cgroup execute --input <input.json>",
+"mcp": "tool.j.per-tool-memcap-cgroup",
+"api": "POST /utos/tools/per-tool-memcap-cgroup"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/per-tool-memcap-cgroup"
+},
+{
+"name": "redispatch-idempotency-guard",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "重投（redispatch）一个 run 前，先校验 **原进程真死** + **预留槽位/退路已退**，否则拒投，根治\"同一 run 占双份/分身续派/看门狗自燃\"。",
+"interfaces": {
+"cli": "utos tool redispatch-idempotency-guard execute --input <input.json>",
+"mcp": "tool.j.redispatch-idempotency-guard",
+"api": "POST /utos/tools/redispatch-idempotency-guard"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/redispatch-idempotency-guard"
+},
+{
+"name": "sandbox-2pc-claim",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "把\"领任务\"做成 **prepare 预留 → commit 确认产出 → 失败 abort 退还** 的两阶段占用，根治 fleet「占而不产」（worker 抢了 task 槽/沙盒/产线名额却空转，槽位被死锁、看门狗自燃续派）。",
+"interfaces": {
+"cli": "utos tool sandbox-2pc-claim execute --input <input.json>",
+"mcp": "tool.j.sandbox-2pc-claim",
+"api": "POST /utos/tools/sandbox-2pc-claim"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/sandbox-2pc-claim"
+},
+{
+"name": "sandbox-data-shredder",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "沙盒回收/拆离前，强制擦除该租户在磁盘 + 内存 + 临时副本中的全部数据，保证下一租户拿到**干净沙盒**。",
+"interfaces": {
+"cli": "utos tool sandbox-data-shredder execute --input <input.json>",
+"mcp": "tool.j.sandbox-data-shredder",
+"api": "POST /utos/tools/sandbox-data-shredder"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/sandbox-data-shredder"
+},
+{
+"name": "sandbox-isolate",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "沙盒隔离：独立 worktree、临时目录、权限、网络和资源隔离。",
+"interfaces": {
+"cli": "utos tool sandbox-isolate execute --input <input.json>",
+"mcp": "tool.j.sandbox-isolate",
+"api": "POST /utos/tools/sandbox-isolate"
+},
+"deps": [
+"file-manager"
+],
+"status": "built",
+"module_path": "tools/J_infrastructure/sandbox-isolate"
+},
+{
+"name": "tool-backpressure-queue",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "UTOS 工具深拆 · 工具背压队列 `tool-backpressure-queue`",
+"interfaces": {
+"cli": "utos tool tool-backpressure-queue execute --input <input.json>",
+"mcp": "tool.j.tool-backpressure-queue",
+"api": "POST /utos/tools/tool-backpressure-queue"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/tool-backpressure-queue"
+},
+{
+"name": "tool-package-installer",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "工具包安装器：上传/导入工具包后执行契约校验、沙盒验证、注册 disabled、等待启用。",
+"interfaces": {
+"cli": "utos tool tool-package-installer execute --input <input.json>",
+"mcp": "tool.j.tool-package-installer",
+"api": "POST /utos/tools/tool-package-installer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/J_infrastructure/tool-package-installer"
+},
+{
+"name": "tool-package-remover",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "工具包删除器：执行依赖影响分析、drain、disable、archive、remove，保证删除不破坏其它工具。",
+"interfaces": {
+"cli": "utos tool tool-package-remover execute --input <input.json>",
+"mcp": "tool.j.tool-package-remover",
+"api": "POST /utos/tools/tool-package-remover"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/J_infrastructure/tool-package-remover"
+},
+{
+"name": "tool-resource-fence",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "tool-resource-fence（资源围栏 / cgroup 配额仲裁器） · OSS 集名家所长方案",
+"interfaces": {
+"cli": "utos tool tool-resource-fence execute --input <input.json>",
+"mcp": "tool.j.tool-resource-fence",
+"api": "POST /utos/tools/tool-resource-fence"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/tool-resource-fence"
+},
+{
+"name": "tool-runtime-isolation-broker",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "为每个工具在 manifest 增补并**强制** `runtime_boundary{container,netns,uid,caps,cgroup,volume}` 声明，作为**网格级 Runtime 准入闸**——未声明隔离边界的工具**拒绝上网格**。补 R1–R6 全部 manifest 空白。",
+"interfaces": {
+"cli": "utos tool tool-runtime-isolation-broker execute --input <input.json>",
+"mcp": "tool.j.tool-runtime-isolation-broker",
+"api": "POST /utos/tools/tool-runtime-isolation-broker"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/tool-runtime-isolation-broker"
+},
+{
+"name": "tool-sandbox-pool",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "让每个工具在**隔离运行 + 资源配额**里跑，从根上治死「29G thrash 拖垮整机/派不动/终端沙盒齐崩」。",
+"interfaces": {
+"cli": "utos tool tool-sandbox-pool execute --input <input.json>",
+"mcp": "tool.j.tool-sandbox-pool",
+"api": "POST /utos/tools/tool-sandbox-pool"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/J_infrastructure/tool-sandbox-pool"
+},
+{
+"name": "tool-secrets-vault",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "工具密钥库：按工具、租户、运行实例注入最小权限密钥，禁止明文写入 manifest。",
+"interfaces": {
+"cli": "utos tool tool-secrets-vault execute --input <input.json>",
+"mcp": "tool.j.tool-secrets-vault",
+"api": "POST /utos/tools/tool-secrets-vault"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/J_infrastructure/tool-secrets-vault"
+},
+{
+"name": "universal-tool-container-runtime",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "统一工具容器运行时：把任意工具按 UTC 规范封装成可隔离运行、可限额、可审计的容器实例。",
+"interfaces": {
+"cli": "utos tool universal-tool-container-runtime execute --input <input.json>",
+"mcp": "tool.j.universal-tool-container-runtime",
+"api": "POST /utos/tools/universal-tool-container-runtime"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/J_infrastructure/universal-tool-container-runtime"
+},
+{
+"name": "version-mgmt",
+"category": "J_infrastructure",
+"category_zh": "基础设施",
+"version": "0.1.0",
+"description": "版本管理：将工具版本、模型版本、配置版本钉到每次 run。",
+"interfaces": {
+"cli": "utos tool version-mgmt execute --input <input.json>",
+"mcp": "tool.j.version-mgmt",
+"api": "POST /utos/tools/version-mgmt"
+},
+"deps": [
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/J_infrastructure/version-mgmt"
+},
+{
+"name": "code-knowledge-graph-store",
+"category": "D_memory_data",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "把 CodeIndex/CodeFlow 写入 SQLite、Neo4j、FalkorDB 或 Kuzu，提供图查询和版本快照。",
+"interfaces": {
+"cli": "utos tool code-knowledge-graph-store <action> --payload ./input.json",
+"mcp": "tool.D_memory_data.code-knowledge-graph-store",
+"api": "POST /utos/tools/code-knowledge-graph-store"
+},
+"deps": [
+"code-indexer"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/code-knowledge-graph-store"
+},
+{
+"name": "data-archive",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "数据归档：将项目文件、证据、trace、报告按版本归档。",
+"interfaces": {
+"cli": "utos tool data-archive archive --input <input.json>",
+"mcp": "tool.d.data-archive",
+"api": "POST /utos/tools/data-archive"
+},
+"deps": [
+"file-manager",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/D_memory_data/data-archive"
+},
+{
+"name": "data-contract-stamper",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "UTOS 工具集众长方案 · data-contract-stamper（数据契约版本戳器）· extra-63",
+"interfaces": {
+"cli": "utos tool data-contract-stamper execute --input <input.json>",
+"mcp": "tool.d.data-contract-stamper",
+"api": "POST /utos/tools/data-contract-stamper"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/D_memory_data/data-contract-stamper"
+},
+{
+"name": "dev-file-pack-generator",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "完整项目开发文件包生成器：聚合九层文件、API契约、数据模型、验收计划为 DevFilePack。",
+"interfaces": {
+"cli": "utos tool dev-file-pack-generator generate --input <input.json>",
+"mcp": "tool.d.dev-file-pack-generator",
+"api": "POST /utos/tools/dev-file-pack-generator"
+},
+"deps": [
+"nine-layer-deep-dive",
+"doc-tool",
+"json-convert"
+],
+"status": "built",
+"module_path": "tools/D_memory_data/dev-file-pack-generator"
+},
+{
+"name": "json-convert",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "转 JSON：把文档、表格、流程描述转换为机器可读 JSON 合同。",
+"interfaces": {
+"cli": "utos tool json-convert convert --input <input.json>",
+"mcp": "tool.d.json-convert",
+"api": "POST /utos/tools/json-convert"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/D_memory_data/json-convert"
+},
+{
+"name": "memory-clear",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "记忆清除/隔离：按项目/会话/工具清理不可信或过期记忆，避免污染。",
+"interfaces": {
+"cli": "utos tool memory-clear execute --input <input.json>",
+"mcp": "tool.d.memory-clear",
+"api": "POST /utos/tools/memory-clear"
+},
+"deps": [
+"memory-store",
+"content-isolation"
+],
+"status": "built",
+"module_path": "tools/D_memory_data/memory-clear"
+},
+{
+"name": "memory-store",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "记忆储存/六层分层：项目、用户、工具、生产线、证据、长期经验的分层记忆。",
+"interfaces": {
+"cli": "utos tool memory-store execute --input <input.json>",
+"mcp": "tool.d.memory-store",
+"api": "POST /utos/tools/memory-store"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/D_memory_data/memory-store"
+},
+{
+"name": "nine-layer-deep-dive",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "九层深挖器：调用拆解法生成业务、角色、功能、页面、数据、API、状态、异常、验收九层文件。",
+"interfaces": {
+"cli": "utos tool nine-layer-deep-dive decompose --input <input.json>",
+"mcp": "tool.d.nine-layer-deep-dive",
+"api": "POST /utos/tools/nine-layer-deep-dive"
+},
+"deps": [
+"vuln-fractal-decompose",
+"model-router",
+"prompt-binder"
+],
+"status": "built",
+"module_path": "tools/D_memory_data/nine-layer-deep-dive"
+},
+{
+"name": "retention-orchestrator",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "把\"留存到期\"做成跨工具广播事件，源到期 → 级联触发**所有副本落点**（队列/saga/trace/沙盒）删除并**收齐回执**，缺一不算闭环。补 crossGap#4。",
+"interfaces": {
+"cli": "utos tool retention-orchestrator execute --input <input.json>",
+"mcp": "tool.d.retention-orchestrator",
+"api": "POST /utos/tools/retention-orchestrator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/D_memory_data/retention-orchestrator"
+},
+{
+"name": "status-cas-writer",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "对 `utos.tool_registry.status` / `.enabled` 等状态列的所有写入，强制走 **带 `expected_version` 的 compare-and-swap**；DEP（部署器）/PRB（探活）/看门狗等多写者并发写时**互不盲覆盖**，杀死探活的写**不会被旧版本盖回**。",
+"interfaces": {
+"cli": "utos tool status-cas-writer execute --input <input.json>",
+"mcp": "tool.d.status-cas-writer",
+"api": "POST /utos/tools/status-cas-writer"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/D_memory_data/status-cas-writer"
+},
+{
+"name": "tool-artifact-store",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "工具产物仓库：统一保存文档、截图、日志、流程图、验证报告、运行证据和哈希索引。",
+"interfaces": {
+"cli": "utos tool tool-artifact-store execute --input <input.json>",
+"mcp": "tool.d.tool-artifact-store",
+"api": "POST /utos/tools/tool-artifact-store"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/D_memory_data/tool-artifact-store"
+},
+{
+"name": "vuln-fractal-decompose",
+"category": "D_memory_data",
+"category_zh": "记忆数据",
+"version": "0.1.0",
+"description": "拆解法：九层/多维度深挖，将模糊需求拆成结构化项目文件与验收点。",
+"interfaces": {
+"cli": "utos tool vuln-fractal-decompose decompose --input <input.json>",
+"mcp": "tool.d.vuln-fractal-decompose",
+"api": "POST /utos/tools/vuln-fractal-decompose"
+},
+"deps": [
+"model-router"
+],
+"status": "built",
+"module_path": "tools/D_memory_data/vuln-fractal-decompose"
+},
+{
+"name": "api-connector",
+"category": "E_integration_sync",
+"category_zh": "集成同步",
+"version": "0.1.0",
+"description": "第三方 API 接入：统一凭证、重试、限流、熔断、审计和响应标准化。",
+"interfaces": {
+"cli": "utos tool api-connector execute --input <input.json>",
+"mcp": "tool.e.api-connector",
+"api": "POST /utos/tools/api-connector"
+},
+"deps": [
+"rbac-auth",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/E_integration_sync/api-connector"
+},
+{
+"name": "data-classification-propagator",
+"category": "E_integration_sync",
+"category_zh": "集成同步",
+"version": "0.1.0",
+"description": "UTOS 工具深度拆解 + OSS 集成方案 · `data-classification-propagator`（extra-99）",
+"interfaces": {
+"cli": "utos tool data-classification-propagator execute --input <input.json>",
+"mcp": "tool.e.data-classification-propagator",
+"api": "POST /utos/tools/data-classification-propagator"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_oss_extensions/E_integration_sync/data-classification-propagator"
+},
+{
+"name": "downloader",
+"category": "E_integration_sync",
+"category_zh": "集成同步",
+"version": "0.1.0",
+"description": "下载工具：统一下载外部资料、依赖文件、模型产物和验收材料。",
+"interfaces": {
+"cli": "utos tool downloader execute --input <input.json>",
+"mcp": "tool.e.downloader",
+"api": "POST /utos/tools/downloader"
+},
+"deps": [
+"file-manager"
+],
+"status": "built",
+"module_path": "tools/E_integration_sync/downloader"
+},
+{
+"name": "gdrive-sync",
+"category": "E_integration_sync",
+"category_zh": "集成同步",
+"version": "0.1.0",
+"description": "Google Drive 同步：项目文档、截图、日志、归档文件同步。",
+"interfaces": {
+"cli": "utos tool gdrive-sync sync --input <input.json>",
+"mcp": "tool.e.gdrive-sync",
+"api": "POST /utos/tools/gdrive-sync"
+},
+"deps": [
+"api-connector"
+],
+"status": "built",
+"module_path": "tools/E_integration_sync/gdrive-sync"
+},
+{
+"name": "github-sync",
+"category": "E_integration_sync",
+"category_zh": "集成同步",
+"version": "0.1.0",
+"description": "GitHub 同步：仓库、分支、commit、issue、PR 元数据同步。",
+"interfaces": {
+"cli": "utos tool github-sync sync --input <input.json>",
+"mcp": "tool.e.github-sync",
+"api": "POST /utos/tools/github-sync"
+},
+"deps": [
+"api-connector"
+],
+"status": "built",
+"module_path": "tools/E_integration_sync/github-sync"
+},
+{
+"name": "pr-pusher",
+"category": "E_integration_sync",
+"category_zh": "集成同步",
+"version": "0.1.0",
+"description": "PR 推送：将代码变更、验收报告、证据摘要推送为 Pull Request。",
+"interfaces": {
+"cli": "utos tool pr-pusher execute --input <input.json>",
+"mcp": "tool.e.pr-pusher",
+"api": "POST /utos/tools/pr-pusher"
+},
+"deps": [
+"github-sync",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/E_integration_sync/pr-pusher"
+},
+{
+"name": "repo-change-trigger",
+"category": "E_integration_sync",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "接收 Git Push、PR、定时任务和 webhook，触发代码索引和图谱刷新。",
+"interfaces": {
+"cli": "utos tool repo-change-trigger <action> --payload ./input.json",
+"mcp": "tool.E_integration_sync.repo-change-trigger",
+"api": "POST /utos/tools/repo-change-trigger"
+},
+"deps": [
+"state-machine-gate"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/repo-change-trigger"
+},
+{
+"name": "uploader",
+"category": "E_integration_sync",
+"category_zh": "集成同步",
+"version": "0.1.0",
+"description": "上传工具：统一上传文件、图片、日志、报告到对象存储或外部系统。",
+"interfaces": {
+"cli": "utos tool uploader execute --input <input.json>",
+"mcp": "tool.e.uploader",
+"api": "POST /utos/tools/uploader"
+},
+"deps": [
+"file-manager"
+],
+"status": "built",
+"module_path": "tools/E_integration_sync/uploader"
+},
+{
+"name": "webhook",
+"category": "E_integration_sync",
+"category_zh": "集成同步",
+"version": "0.1.0",
+"description": "Webhook：签名校验、事件接收、幂等处理和事件总线转发。",
+"interfaces": {
+"cli": "utos tool webhook execute --input <input.json>",
+"mcp": "tool.e.webhook",
+"api": "POST /utos/tools/webhook"
+},
+"deps": [
+"event-bus",
+"rbac-auth"
+],
+"status": "built",
+"module_path": "tools/E_integration_sync/webhook"
+},
+{
+"name": "codex-vm-acceptance",
+"category": "F_media_resources",
+"category_zh": "媒体资源",
+"version": "0.1.0",
+"description": "Codex VM 操作验收器：安装、构建、启动、E2E、浏览器操作、日志与截图采集。",
+"interfaces": {
+"cli": "utos tool codex-vm-acceptance verify --input <input.json>",
+"mcp": "tool.f.codex-vm-acceptance",
+"api": "POST /utos/tools/codex-vm-acceptance"
+},
+"deps": [
+"device-vm-verify",
+"sandbox-isolate",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/F_media_resources/codex-vm-acceptance"
+},
+{
+"name": "device-vm-verify",
+"category": "F_media_resources",
+"category_zh": "媒体资源",
+"version": "0.1.0",
+"description": "真机/虚机验证：ZFold7 真机/虚拟机操作、安装、启动、截图、日志、结果验收。",
+"interfaces": {
+"cli": "utos tool device-vm-verify verify --input <input.json>",
+"mcp": "tool.f.device-vm-verify",
+"api": "POST /utos/tools/device-vm-verify"
+},
+"deps": [
+"screenshot",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/F_media_resources/device-vm-verify"
+},
+{
+"name": "file-manager",
+"category": "F_media_resources",
+"category_zh": "媒体资源",
+"version": "0.1.0",
+"description": "文件管理：项目文件、临时文件、归档、权限、哈希、清理。",
+"interfaces": {
+"cli": "utos tool file-manager execute --input <input.json>",
+"mcp": "tool.f.file-manager",
+"api": "POST /utos/tools/file-manager"
+},
+"deps": [
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/F_media_resources/file-manager"
+},
+{
+"name": "photo-compress",
+"category": "F_media_resources",
+"category_zh": "媒体资源",
+"version": "0.1.0",
+"description": "照片压缩：压缩、转码、去元数据、尺寸限制和质量控制。",
+"interfaces": {
+"cli": "utos tool photo-compress compress --input <input.json>",
+"mcp": "tool.f.photo-compress",
+"api": "POST /utos/tools/photo-compress"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/F_media_resources/photo-compress"
+},
+{
+"name": "qwen-screenshot-acceptance",
+"category": "F_media_resources",
+"category_zh": "媒体资源",
+"version": "0.1.0",
+"description": "千问截图验收器：对 Playwright/真机截图进行视觉与交互结果验收。",
+"interfaces": {
+"cli": "utos tool qwen-screenshot-acceptance verify --input <input.json>",
+"mcp": "tool.f.qwen-screenshot-acceptance",
+"api": "POST /utos/tools/qwen-screenshot-acceptance"
+},
+"deps": [
+"screenshot",
+"device-vm-verify",
+"model-router",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/F_media_resources/qwen-screenshot-acceptance"
+},
+{
+"name": "screenshot",
+"category": "F_media_resources",
+"category_zh": "媒体资源",
+"version": "0.1.0",
+"description": "截图工具：折叠屏/真机/浏览器截图采集、命名、归档与证据登记。",
+"interfaces": {
+"cli": "utos tool screenshot capture --input <input.json>",
+"mcp": "tool.f.screenshot",
+"api": "POST /utos/tools/screenshot"
+},
+"deps": [
+"file-manager",
+"evidence-ledger"
+],
+"status": "built",
+"module_path": "tools/F_media_resources/screenshot"
+},
+{
+"name": "animation",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "动效工具：转场、反馈、加载、状态变化动效规范与生成。",
+"interfaces": {
+"cli": "utos tool animation execute --input <input.json>",
+"mcp": "tool.g.animation",
+"api": "POST /utos/tools/animation"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/animation"
+},
+{
+"name": "color-scheme",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "配色工具：系统色板、暗黑模式、状态颜色和可访问性校验。",
+"interfaces": {
+"cli": "utos tool color-scheme execute --input <input.json>",
+"mcp": "tool.g.color-scheme",
+"api": "POST /utos/tools/color-scheme"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/color-scheme"
+},
+{
+"name": "deepwiki-page-generator",
+"category": "G_website_ui",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "把架构理解、调用链、影响分析和流程图生成研发知识库/DeepWiki 风格页面。",
+"interfaces": {
+"cli": "utos tool deepwiki-page-generator <action> --payload ./input.json",
+"mcp": "tool.G_website_ui.deepwiki-page-generator",
+"api": "POST /utos/tools/deepwiki-page-generator"
+},
+"deps": [
+"architecture-understanding-agent",
+"callchain-tracing-agent",
+"impact-analysis-agent",
+"diagram-renderer"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/deepwiki-page-generator"
+},
+{
+"name": "diagram-renderer",
+"category": "G_website_ui",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "把 Mermaid、PlantUML、Graphviz 渲染成 SVG、PNG 和 Markdown 文档片段。",
+"interfaces": {
+"cli": "utos tool diagram-renderer <action> --payload ./input.json",
+"mcp": "tool.G_website_ui.diagram-renderer",
+"api": "POST /utos/tools/diagram-renderer"
+},
+"deps": [
+"flowchart-generation-agent"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/diagram-renderer"
+},
+{
+"name": "doc-tool",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "文档工具：生成、预览、导出、索引项目文档和工具文档。",
+"interfaces": {
+"cli": "utos tool doc-tool execute --input <input.json>",
+"mcp": "tool.g.doc-tool",
+"api": "POST /utos/tools/doc-tool"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/doc-tool"
+},
+{
+"name": "icon",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "图标工具：图标库、状态图标、工具图标、图标命名和导出。",
+"interfaces": {
+"cli": "utos tool icon execute --input <input.json>",
+"mcp": "tool.g.icon",
+"api": "POST /utos/tools/icon"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/icon"
+},
+{
+"name": "layout",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "布局工具：页面栅格、区域、卡片、表单、画布容器布局生成。",
+"interfaces": {
+"cli": "utos tool layout execute --input <input.json>",
+"mcp": "tool.g.layout",
+"api": "POST /utos/tools/layout"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/layout"
+},
+{
+"name": "production-canvas-view",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "生产线画布视图：展示小队、角色、任务、依赖、证据链、失败线和签收状态。",
+"interfaces": {
+"cli": "utos tool production-canvas-view render --input <input.json>",
+"mcp": "tool.g.production-canvas-view",
+"api": "POST /utos/tools/production-canvas-view"
+},
+"deps": [
+"canvas-orchestrator",
+"visualization",
+"dashboard"
+],
+"status": "built",
+"module_path": "tools/G_website_ui/production-canvas-view"
+},
+{
+"name": "responsive-fold",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "折叠屏适配：ZFold 等设备断点、双栏、旋转、缩放与截图验收。",
+"interfaces": {
+"cli": "utos tool responsive-fold execute --input <input.json>",
+"mcp": "tool.g.responsive-fold",
+"api": "POST /utos/tools/responsive-fold"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/responsive-fold"
+},
+{
+"name": "theme",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "主题工具：主题变量、暗黑/浅色、品牌化与组件主题同步。",
+"interfaces": {
+"cli": "utos tool theme execute --input <input.json>",
+"mcp": "tool.g.theme",
+"api": "POST /utos/tools/theme"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/theme"
+},
+{
+"name": "tool-website-console",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "网站控制台：提供工具库、画布编排、运行监控、证据账本、状态机、模块增删的 Web UI。",
+"interfaces": {
+"cli": "utos tool tool-website-console execute --input <input.json>",
+"mcp": "tool.g.tool-website-console",
+"api": "POST /utos/tools/tool-website-console"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools_runtime_system/G_website_ui/tool-website-console"
+},
+{
+"name": "typography",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "文字排版：字号、行高、字体层级、标题正文规范和多语言适配。",
+"interfaces": {
+"cli": "utos tool typography execute --input <input.json>",
+"mcp": "tool.g.typography",
+"api": "POST /utos/tools/typography"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/typography"
+},
+{
+"name": "ui-component",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "UI 组件：严格跟系统一致的组件生成、注册、复用和验收。",
+"interfaces": {
+"cli": "utos tool ui-component execute --input <input.json>",
+"mcp": "tool.g.ui-component",
+"api": "POST /utos/tools/ui-component"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/ui-component"
+},
+{
+"name": "visualization",
+"category": "G_website_ui",
+"category_zh": "网站UI",
+"version": "0.1.0",
+"description": "可视化图表：流程图、依赖图、仪表盘图、证据链图渲染。",
+"interfaces": {
+"cli": "utos tool visualization execute --input <input.json>",
+"mcp": "tool.g.visualization",
+"api": "POST /utos/tools/visualization"
+},
+"deps": [],
+"status": "built",
+"module_path": "tools/G_website_ui/visualization"
+},
+{
+"name": "architecture-understanding-agent",
+"category": "H_model_ai",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "基于代码知识图谱生成模块边界、服务分层、关键路径和架构说明。",
+"interfaces": {
+"cli": "utos tool architecture-understanding-agent <action> --payload ./input.json",
+"mcp": "tool.H_model_ai.architecture-understanding-agent",
+"api": "POST /utos/tools/architecture-understanding-agent"
+},
+"deps": [
+"flowmap-mcp-server",
+"code-knowledge-graph-store"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/architecture-understanding-agent"
+},
+{
+"name": "constraint-algo",
+"category": "H_model_ai",
+"category_zh": "模型AI",
+"version": "0.1.0",
+"description": "约束算法：Φ_done 底层约束、输出收敛与验收条件生成。",
+"interfaces": {
+"cli": "utos tool constraint-algo constrain --input <input.json>",
+"mcp": "tool.h.constraint-algo",
+"api": "POST /utos/tools/constraint-algo"
+},
+"deps": [
+"pipeline-constraint-verifier"
+],
+"status": "built",
+"module_path": "tools/H_model_ai/constraint-algo"
+},
+{
+"name": "content-isolation",
+"category": "H_model_ai",
+"category_zh": "模型AI",
+"version": "0.1.0",
+"description": "不可信内容隔离/防注入：隔离外部文本、网页、文件中的恶意指令和污染上下文。",
+"interfaces": {
+"cli": "utos tool content-isolation execute --input <input.json>",
+"mcp": "tool.h.content-isolation",
+"api": "POST /utos/tools/content-isolation"
+},
+"deps": [
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/H_model_ai/content-isolation"
+},
+{
+"name": "flowchart-generation-agent",
+"category": "H_model_ai",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "把架构分析、调用链、影响面、NoCodeFlow/CodeFlow 转成 Mermaid、PlantUML 或 Graphviz 图描述。",
+"interfaces": {
+"cli": "utos tool flowchart-generation-agent <action> --payload ./input.json",
+"mcp": "tool.H_model_ai.flowchart-generation-agent",
+"api": "POST /utos/tools/flowchart-generation-agent"
+},
+"deps": [
+"architecture-understanding-agent",
+"callchain-tracing-agent",
+"impact-analysis-agent"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/flowchart-generation-agent"
+},
+{
+"name": "impact-analysis-agent",
+"category": "H_model_ai",
+"category_zh": "代码知识图谱",
+"version": "0.1.0",
+"description": "基于代码图谱和变更 diff 分析影响范围、风险节点、受影响测试和回归建议。",
+"interfaces": {
+"cli": "utos tool impact-analysis-agent <action> --payload ./input.json",
+"mcp": "tool.H_model_ai.impact-analysis-agent",
+"api": "POST /utos/tools/impact-analysis-agent"
+},
+"deps": [
+"code-knowledge-graph-store",
+"patch-evidence-submitter"
+],
+"status": "built",
+"module_path": "tools_flowmap_codegraph/impact-analysis-agent"
+},
+{
+"name": "model-router",
+"category": "H_model_ai",
+"category_zh": "模型AI",
+"version": "0.1.0",
+"description": "模型路由 cc/cx/ds/qw：按任务类型、成本、上下文、权限选择模型。",
+"interfaces": {
+"cli": "utos tool model-router route --input <input.json>",
+"mcp": "tool.h.model-router",
+"api": "POST /utos/tools/model-router"
+},
+"deps": [
+"rbac-auth",
+"trace-causal"
+],
+"status": "built",
+"module_path": "tools/H_model_ai/model-router"
+},
+{
+"name": "prompt-binder",
+"category": "H_model_ai",
+"category_zh": "模型AI",
+"version": "0.1.0",
+"description": "提示词绑定/契约注入：将项目合同、流程图、验收规则绑定到模型调用上下文。",
+"interfaces": {
+"cli": "utos tool prompt-binder execute --input <input.json>",
+"mcp": "tool.h.prompt-binder",
+"api": "POST /utos/tools/prompt-binder"
+},
+"deps": [
+"model-router",
+"content-isolation"
+],
+"status": "built",
+"module_path": "tools/H_model_ai/prompt-binder"
+},
+{
+"name": "prototype-doc-generator",
+"category": "H_model_ai",
+"category_zh": "模型AI",
+"version": "0.1.0",
+"description": "Prototyping 项目开发文档生成器：把碎片需求整理为可开发文档。",
+"interfaces": {
+"cli": "utos tool prototype-doc-generator generate --input <input.json>",
+"mcp": "tool.h.prototype-doc-generator",
+"api": "POST /utos/tools/prototype-doc-generator"
+},
+"deps": [
+"flowmap-intake",
+"model-router",
+"prompt-binder",
+"doc-tool"
+],
+"status": "built",
+"module_path": "tools/H_model_ai/prototype-doc-generator"
+},
+{
+"name": "skill-gen",
+"category": "H_model_ai",
+"category_zh": "模型AI",
+"version": "0.1.0",
+"description": "Skill 生成/管理：生成、版本化、启停和测试模型 skill。",
+"interfaces": {
+"cli": "utos tool skill-gen generate --input <input.json>",
+"mcp": "tool.h.skill-gen",
+"api": "POST /utos/tools/skill-gen"
+},
+"deps": [
+"model-router",
+"charter-check"
+],
+"status": "built",
+"module_path": "tools/H_model_ai/skill-gen"
+}
+]
+}
